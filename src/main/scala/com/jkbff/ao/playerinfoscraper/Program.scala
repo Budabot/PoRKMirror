@@ -22,7 +22,7 @@ object Program {
 	
 	private val log = Logger.getLogger(Program.getClass())
 	
-	val emf: EntityManagerFactory = Persistence.createEntityManagerFactory("playerinfo")
+	//val emf: EntityManagerFactory = Persistence.createEntityManagerFactory("playerinfo")
 
 	def main(args: Array[String]): Unit = {
 		// initialize the log4j component
@@ -36,8 +36,8 @@ object Program {
 		
 		val orgNameUrl = "http://people.anarchy-online.com/people/lookup/orgs.html?l=%s"
 		
-		//val letters = List("a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "others")
-		val letters = List("q")
+		val letters = List("a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "others")
+		//val letters = List("q")
 
 		var orgInfoList = List[OrgInfo]()
 		letters.foreach(letter => {
@@ -52,7 +52,7 @@ object Program {
 			val orgInfoOption = retrieveOrgRoster(orgInfo)
 			if (orgInfoOption.isDefined) {
 				numCharacters.addAndGet(orgInfoOption.get.size)
-				save(orgInfo, orgInfoOption.get)
+				save(orgInfo, orgInfoOption.get, startTime)
 			}
 		})
 		
@@ -61,8 +61,16 @@ object Program {
 		log.info("Characters parsed: " + numCharacters)
 	}
 	
-	def save(orgInfo: OrgInfo, characters: List[Character]) = {
-		// TODO
+	def save(orgInfo: OrgInfo, characters: List[Character], time: Long) = {
+		Helper.using(Database.getConnection()) {
+			connection => {
+				connection.setAutoCommit(false)
+				OrgDao.save(connection, orgInfo, time)
+				characters.foreach(x => CharacterDao.save(connection, x, time))
+				connection.commit()
+				connection.setAutoCommit(true)
+			}
+		}
 	}
 	
 	def retrieveOrgRoster(orgInfo: OrgInfo): Option[List[Character]] = {
