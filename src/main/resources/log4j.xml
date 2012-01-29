@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE log4j:configuration SYSTEM "log4j.dtd">
+
+<log4j:configuration xmlns:log4j="http://jakarta.apache.org/log4j/">
+	<appender name="console" class="org.apache.log4j.ConsoleAppender">
+		<param name="Target" value="System.out"/>
+		<layout class="org.apache.log4j.PatternLayout">
+			<param name="ConversionPattern" value="%d %5p [%t] (%F:%L) - %m%n"/>
+		</layout>
+	</appender>
+	
+	<!-- C:\>mvn install:install-file -Dfile=c:\Users\Jason\Downloads\log4j-rolling-appender-20110725-1953-1.2.15.jar -DgroupId=uk.org.simonsite -DartifactId=log4j-appender -Dversion=20110725-1953-1.2.15 -Dpackaging=jar -->
+	<appender name="file" class="org.apache.log4j.appender.TimeAndSizeRollingAppender">
+		<param name="File" value="chatbot.log"/>
+		<param name="RollOnStartup" value="true"/>
+		<param name="MaxFileSize" value="10MB"/>
+		<param name="MaxRollFileCount" value="10"/>
+		<layout class="org.apache.log4j.PatternLayout">
+			<param name="ConversionPattern" value="%d %5p [%t] (%F:%L) - %m%n"/>
+		</layout>
+	</appender>
+	
+	<logger name="com.jkbff.ao.tyrlib">
+	    <level value="DEBUG" />
+	</logger>
+	
+	<logger name="org.hibernate">
+	    <level value="DEBUG" />
+	</logger>
+
+	<root> 
+		<priority value="DEBUG" /> 
+		<appender-ref ref="console" />
+		<appender-ref ref="file" />
+	</root>
+  
+</log4j:configuration>

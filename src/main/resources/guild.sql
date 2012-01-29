@@ -1,9 +1,10 @@
 CREATE TABLE guild (
-	guildId INT NOT NULL,
-	guildName VARCHAR(255) NOT NULL,
+	guild_id INT NOT NULL,
+	guild_name VARCHAR(255) NOT NULL,
 	faction VARCHAR(255) NOT NULL,
 	server INT NOT NULL,
-	dt BIGINT NOT NULL
+	last_checked BIGINT NOT NULL,
+	last_changed BIGINT NOT NULL
 );
 
-CREATE INDEX `guild_guildid_server` ON guild(`guildId` ASC, `server` ASC);
+CREATE INDEX `guild_guildid_server` ON guild(`guild_id` ASC, `server` ASC);

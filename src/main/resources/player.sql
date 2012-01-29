@@ -1,19 +1,21 @@
 CREATE TABLE player (
 	nickname VARCHAR(255) NOT NULL,
-	firstName VARCHAR(255) NOT NULL,
-	lastName VARCHAR(255) NOT NULL,
-	guildRank INT NOT NULL,
-	guildRankName VARCHAR(255) NOT NULL,
+	first_name VARCHAR(255) NOT NULL,
+	last_name VARCHAR(255) NOT NULL,
+	guild_rank INT NOT NULL,
+	guild_rank_name VARCHAR(255) NOT NULL,
 	level INT NOT NULL,
 	profession VARCHAR(255) NOT NULL,
-	professionTitle VARCHAR(255) NOT NULL,
+	profession_title VARCHAR(255) NOT NULL,
 	gender VARCHAR(255) NOT NULL,
 	breed VARCHAR(255) NOT NULL,
-	defenderRank INT NOT NULL,
-	defenderRankName VARCHAR(255) NOT NULL,
-	guildId INT NOT NULL,
+	defender_rank INT NOT NULL,
+	defender_rank_name VARCHAR(255) NOT NULL,
+	guild_id INT NOT NULL,
 	server INT NOT NULL,
-	dt BIGINT NOT NULL
+	last_checked BIGINT NOT NULL,
+	last_changed BIGINT NOT NULL
 );
 
 CREATE INDEX `player_nickname_server` ON player(`nickname` ASC, `server` ASC);
+CREATE INDEX `player_server_guildId_dt` ON player(`server` ASC, `guild_id` ASC, `last_checked` ASC);

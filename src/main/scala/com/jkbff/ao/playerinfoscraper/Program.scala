@@ -26,7 +26,7 @@ object Program {
 
 	def main(args: Array[String]): Unit = {
 		// initialize the log4j component
-		PropertyConfigurator.configure("log4j.properties")
+		PropertyConfigurator.configure("log4j.xml")
 		
 		Program.run
 	}
@@ -56,12 +56,35 @@ object Program {
 			}
 		})
 		
+		orgInfoList.par.foreach(orgInfo => {
+			updateRemovedGuildMembers(orgInfo, startTime)
+		})
+		
 		log.info("Elapsed time: " + ((System.currentTimeMillis - startTime.toDouble) / 1000) + "s")
 		log.info("Orgs parsed: " + orgInfoList.size)
 		log.info("Characters parsed: " + numCharacters)
 	}
 	
+	def updateRemovedGuildMembers(orgInfo: OrgInfo, time: Long) {
+		log.debug("Removing guild members for guild: " + orgInfo)
+		Helper.using(Database.getConnection()) {
+			connection => {
+				connection.setAutoCommit(false)
+				var characters = CharacterDao.findUnupdatedGuildMembers(connection, orgInfo, time)
+				characters.foreach(x => {
+					val character = new Character(x.nickname, x.firstName, x.lastName, x.guildRank, x.guildRankName, x.level,
+							x.profession, x.professionTitle, x.gender, x.breed, x.defenderRank, x.defenderRankName,
+							0, x.server, 0, 0)
+					CharacterDao.addHistory(connection, character, time)
+				})
+				connection.commit()
+				connection.setAutoCommit(true)
+			}
+		}
+	}
+	
 	def save(orgInfo: OrgInfo, characters: List[Character], time: Long) = {
+		log.debug("Saving guild members for guild: " + orgInfo)
 		Helper.using(Database.getConnection()) {
 			connection => {
 				connection.setAutoCommit(false)
@@ -85,7 +108,7 @@ object Program {
 
 					return Some(characters)
 				} catch {
-					case e: SAXParseException => log.error("Error parsing roster for org: " + orgInfo, e)
+					case e: SAXParseException => log.error("Could not parse roster for org: " + orgInfo, e)
 				}
 			}
 			case None => log.error("Could not load info for org: " + orgInfo)
@@ -122,12 +145,12 @@ object Program {
 	
 	def grabPage(url: String): Option[String] = {
 		for (x <- 1 to 10) {
-			log.info("Attempt " + x + " at grabbing page: " + url)
+			log.debug("Attempt " + x + " at grabbing page: " + url)
 			try {
 				return Some(Source.fromURL(url).mkString)
 			} catch {
 				case e: IOException => {
-					log.warn("Error fetching page")
+					log.warn("Could not fetch page")
 					Thread.sleep(5000)
 				}
 			}

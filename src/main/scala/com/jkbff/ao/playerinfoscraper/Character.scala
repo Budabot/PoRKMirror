@@ -10,6 +10,7 @@ import javax.persistence.IdClass
 import javax.persistence.Table
 import scala.xml.Node
 import javax.persistence.Transient
+import java.sql.ResultSet
 
 class Character(
 		val nickname: String,
@@ -25,11 +26,19 @@ class Character(
 		val defenderRank: Int,
 		val defenderRankName: String,
 		val guildId: Int,
-		val guildName: String,
-		val server: Int) {
+		val server: Int,
+		val lastChecked: Long,
+		val lastChanged: Long) {
 	
 	def this(node: Node, guildId: Int, guildName: String, server: Int) {
-		this((node \ "nickname").text, (node \ "firstname").text, (node \ "lastname").text, (node \ "rank").text.toInt, (node \ "rank_name").text, (node \ "level").text.toInt, (node \ "profession").text, (node \ "profession_title").text, (node \ "gender").text, (node \ "breed").text, (node \ "defender_rank_id").text.toInt, (node \ "defender_rank").text, guildId, guildName, server);
+		this((node \ "nickname").text, (node \ "firstname").text, (node \ "lastname").text, (node \ "rank").text.toInt, (node \ "rank_name").text, (node \ "level").text.toInt, (node \ "profession").text, (node \ "profession_title").text, (node \ "gender").text, (node \ "breed").text, (node \ "defender_rank_id").text.toInt, (node \ "defender_rank").text, guildId, server, 0, 0);
+	}
+	
+	def this(rs: ResultSet) {
+		this(rs.getString("nickname"), rs.getString("first_name"), rs.getString("last_name"), rs.getInt("guild_rank"), rs.getString("guild_rank_name"),
+				rs.getInt("level"), rs.getString("profession"), rs.getString("profession_title"), rs.getString("gender"), rs.getString("breed"),
+				rs.getInt("defender_rank"), rs.getString("defender_rank_name"), rs.getInt("guild_id"), rs.getInt("server"),
+				rs.getLong("last_checked"), rs.getLong("last_changed"))
 	}
 	
 	def compare(character: Character) : Boolean = {
@@ -45,10 +54,9 @@ class Character(
 		if (defenderRank != character.defenderRank) return false
 		if (defenderRankName != character.defenderRankName) return false
 		if (guildId != character.guildId) return false
-		if (guildName != character.guildName) return false
 		
 		return true
 	}
 
-	override def toString = firstName + " \"" + nickname + "\" " + lastName + ", " + guildRankName + ", " + guildName + ", " + server
+	override def toString = firstName + " \"" + nickname + "\" " + lastName + ", " + guildRankName + ", " + server
 }
