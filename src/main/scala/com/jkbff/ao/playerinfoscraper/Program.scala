@@ -32,37 +32,41 @@ object Program {
 	}
 	
 	def run = {
-		val startTime = System.currentTimeMillis
-		
-		val orgNameUrl = "http://people.anarchy-online.com/people/lookup/orgs.html?l=%s"
-		
-		val letters = List("a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "others")
-		//val letters = List("q")
-
-		var orgInfoList = List[OrgInfo]()
-		letters.foreach(letter => {
-			grabPage(orgNameUrl.format(letter)) match {
-				case Some(page) => orgInfoList = pullOrgInfoFromPage(page) ::: orgInfoList
-				case None => log.error("Could not load info for letter: " + letter)
-			}
-		})
-		
-		var numCharacters = new AtomicInteger(0)
-		orgInfoList.par.foreach(orgInfo => {
-			val orgInfoOption = retrieveOrgRoster(orgInfo)
-			if (orgInfoOption.isDefined) {
-				numCharacters.addAndGet(orgInfoOption.get.size)
-				save(orgInfo, orgInfoOption.get, startTime)
-			}
-		})
-		
-		orgInfoList.par.foreach(orgInfo => {
-			updateRemovedGuildMembers(orgInfo, startTime)
-		})
-		
-		log.info("Elapsed time: " + ((System.currentTimeMillis - startTime.toDouble) / 1000) + "s")
-		log.info("Orgs parsed: " + orgInfoList.size)
-		log.info("Characters parsed: " + numCharacters)
+		try {
+			val startTime = System.currentTimeMillis
+			
+			val orgNameUrl = "http://people.anarchy-online.com/people/lookup/orgs.html?l=%s"
+			
+			//val letters = List("a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "others")
+			val letters = List("m")
+	
+			var orgInfoList = List[OrgInfo]()
+			letters.foreach(letter => {
+				grabPage(orgNameUrl.format(letter)) match {
+					case Some(page) => orgInfoList = pullOrgInfoFromPage(page) ::: orgInfoList
+					case None => log.error("Could not load info for letter: " + letter)
+				}
+			})
+			
+			var numCharacters = new AtomicInteger(0)
+			orgInfoList.par.foreach(orgInfo => {
+				val orgInfoOption = retrieveOrgRoster(orgInfo)
+				if (orgInfoOption.isDefined) {
+					numCharacters.addAndGet(orgInfoOption.get.size)
+					save(orgInfo, orgInfoOption.get, startTime)
+				}
+			})
+			
+			orgInfoList.par.foreach(orgInfo => {
+				updateRemovedGuildMembers(orgInfo, startTime)
+			})
+			
+			log.info("Elapsed time: " + ((System.currentTimeMillis - startTime.toDouble) / 1000) + "s")
+			log.info("Orgs parsed: " + orgInfoList.size)
+			log.info("Characters parsed: " + numCharacters)
+		} catch {
+			case e => log.error("Could not finish retrieving info", e)
+		}
 	}
 	
 	def updateRemovedGuildMembers(orgInfo: OrgInfo, time: Long) {
@@ -97,7 +101,7 @@ object Program {
 	}
 	
 	def retrieveOrgRoster(orgInfo: OrgInfo): Option[List[Character]] = {
-		val orgRosterUrl = "http://people.anarchy-online.com/org/stats/d/%s/name/%s/basicstats.xml"
+		val orgRosterUrl = "http://people.anarchy-online.com/org/stats/d/%d/name/%d/basicstats.xml"
 		grabPage(orgRosterUrl.format(orgInfo.server, orgInfo.guildId)) match {
 			case Some(page: String) => {
 				try {
@@ -126,7 +130,7 @@ object Program {
 	}
 	
 	def pullOrgInfoFromPage(page: String) = {
-		log.info("Processing page...")
+		log.info("Processing page: " + page)
 		val pattern = """(?s)<a href="http://people.anarchy-online.com/org/stats/d/(\d)/name/(\d+)">(.+?)</a>""".r
 		var orgInfoList: List[OrgInfo] = List[OrgInfo]()
 		
@@ -150,7 +154,7 @@ object Program {
 				return Some(Source.fromURL(url).mkString)
 			} catch {
 				case e: IOException => {
-					log.warn("Could not fetch page")
+					log.warn("Failed on attempt " + x + " to fetch page: " + url)
 					Thread.sleep(5000)
 				}
 			}

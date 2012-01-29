@@ -6,6 +6,7 @@ import java.io.FileInputStream
 import java.sql.PreparedStatement
 import org.apache.log4j.Logger
 import scala.collection.mutable.WrappedArray
+import java.util.regex.Matcher
 
 object Database {
 	private val log = Logger.getLogger(Program.getClass())
@@ -45,7 +46,7 @@ object Database {
 	def logQuery(sql: String, params: Any*) {
 		var newSql = sql
 		params.foreach( x => {
-			newSql = newSql.replaceFirst("\\?", "'" + x + "'")
+			newSql = newSql.replaceFirst("\\?", "'" + Matcher.quoteReplacement(x.toString()) + "'")
 		})
 		log.debug(newSql)
 	}

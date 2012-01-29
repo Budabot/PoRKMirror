@@ -20,12 +20,8 @@
 		</layout>
 	</appender>
 	
-	<logger name="com.jkbff.ao.tyrlib">
-	    <level value="DEBUG" />
-	</logger>
-	
-	<logger name="org.hibernate">
-	    <level value="DEBUG" />
+	<logger name="com.jkbff">
+	    <level value="INFO" />
 	</logger>
 
 	<root> 
