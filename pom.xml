@@ -36,10 +36,10 @@
 	    	<artifactId>log4j-appender</artifactId>
 	    	<version>20110725-1953-1.2.15</version>
 	    </dependency>
-	    <dependency>
+	    <!-- <dependency>
 	    	<groupId>com.pigirlittle</groupId>
 	    	<artifactId>HibernateSQLite</artifactId>
 	    	<version>1.0</version>
-	    </dependency>
+	    </dependency> -->
 	</dependencies>
 </project>
