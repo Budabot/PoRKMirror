@@ -22,6 +22,8 @@ object Program {
 	
 	private val log = Logger.getLogger(Program.getClass())
 	
+	var longestLength = 0
+	
 	//val emf: EntityManagerFactory = Persistence.createEntityManagerFactory("playerinfo")
 
 	def main(args: Array[String]): Unit = {
@@ -41,32 +43,43 @@ object Program {
 		val orgNameUrl = "http://people.anarchy-online.com/people/lookup/orgs.html?l=%s"
 		
 		val letters = List("a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "others")
-		//val letters = List("m")
+		//val letters = List("q")
 
 		var orgInfoList = List[OrgInfo]()
 		letters.foreach(letter => {
+			updateDisplay("Grabbing orgs that start with: '" + letter + "'")
 			grabPage(orgNameUrl.format(letter)) match {
 				case Some(page) => orgInfoList = pullOrgInfoFromPage(page) ::: orgInfoList
 				case None => log.error("Could not load info for letter: " + letter)
 			}
 		})
 
+		var numGuildsSuccess = new AtomicInteger(0)
+		var numGuildsFailure = new AtomicInteger(0)
 		var numCharacters = new AtomicInteger(0)
 		orgInfoList.par.foreach(orgInfo => {
 			val orgInfoOption = retrieveOrgRoster(orgInfo)
 			if (orgInfoOption.isDefined) {
 				numCharacters.addAndGet(orgInfoOption.get.size)
 				save(orgInfo, orgInfoOption.get, startTime)
+				numGuildsSuccess.addAndGet(1)
+			} else {
+				numGuildsFailure.addAndGet(1)
 			}
+			updateGuildDisplay(numGuildsSuccess.get, numGuildsFailure.get, orgInfoList.size)
 		})
 		
 		orgInfoList.par.foreach(orgInfo => {
 			updateRemovedGuildMembers(orgInfo, startTime)
 		})
 		
-		log.info("Elapsed time: " + ((System.currentTimeMillis - startTime.toDouble) / 1000) + "s")
-		log.info("Orgs parsed: " + orgInfoList.size)
-		log.info("Characters parsed: " + numCharacters)
+		val elapsedTime = "Elapsed time: " + ((System.currentTimeMillis - startTime.toDouble) / 1000) + "s"
+		val numCharactersParsed = "Characters parsed: " + numCharacters
+		log.info(elapsedTime)
+		log.info(numCharactersParsed)
+		println
+		println(elapsedTime)
+		println(numCharactersParsed)
 	}
 	
 	def updateRemovedGuildMembers(orgInfo: OrgInfo, time: Long) {
@@ -77,7 +90,7 @@ object Program {
 				var characters = CharacterDao.findUnupdatedGuildMembers(connection, orgInfo, time)
 				characters.foreach(x => {
 					val character = new Character(x.nickname, x.firstName, x.lastName, x.guildRank, x.guildRankName, x.level,
-							x.profession, x.professionTitle, x.gender, x.breed, x.defenderRank, x.defenderRankName,
+							orgInfo.faction, x.profession, x.professionTitle, x.gender, x.breed, x.defenderRank, x.defenderRankName,
 							0, x.server, 0, 0)
 					CharacterDao.addHistory(connection, character, time)
 				})
@@ -109,7 +122,7 @@ object Program {
 					val xml = XML.loadString(page.replace("\u0010", "").replace("\u0018", ""))
 					orgInfo.faction = (xml \ "side").text
 					
-					val characters = pullCharInfo((xml \\ "member").reverseIterator, orgInfo.guildId, orgInfo.guildName, orgInfo.server)
+					val characters = pullCharInfo((xml \\ "member").reverseIterator, orgInfo)
 
 					return Some(characters)
 				} catch {
@@ -122,12 +135,12 @@ object Program {
 	}
 	
 	@tailrec
-	def pullCharInfo(iter: Iterator[Node], guildId: Int, guildName: String, server: Int, list: List[Character] = Nil): List[Character] = {
+	def pullCharInfo(iter: Iterator[Node], orgInfo: OrgInfo, list: List[Character] = Nil): List[Character] = {
 		if (!iter.hasNext) {
 			return list
 		}
 		
-		return pullCharInfo(iter, guildId, guildName, server, new Character(iter.next, guildId, guildName, server) :: list)
+		return pullCharInfo(iter, orgInfo, new Character(iter.next, orgInfo.faction, orgInfo.guildId, orgInfo.guildName, orgInfo.server) :: list)
 	}
 	
 	def pullOrgInfoFromPage(page: String) = {
@@ -161,5 +174,16 @@ object Program {
 			}
 		}
 		return None
+	}
+	
+	def updateGuildDisplay(numGuildsSuccess: Int, numGuildsFailure: Int, numGuildsTotal: Int) {
+		updateDisplay("Success: %d  Failed: %d  Total: %d".format(numGuildsSuccess, numGuildsFailure, numGuildsTotal))
+	}
+	
+	def updateDisplay(msg: String) {
+		if (msg.length > longestLength) {
+			longestLength = msg.length
+		}
+		print("\r" + msg + (" " * (longestLength - msg.length)))
 	}
 }

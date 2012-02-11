@@ -14,6 +14,7 @@ object CharacterDao {
 				"p1.guild_rank = ? AND " +
 				"p1.guild_rank_name = ? AND " +
 				"p1.level = ? AND " +
+				"p1.faction = ? AND " +
 				"p1.profession = ? AND " +
 				"p1.profession_title = ? AND " +
 				"p1.gender = ? AND " +
@@ -24,8 +25,8 @@ object CharacterDao {
 		
 		val statement = Database.prepareStatement(connection, sql, character.nickname, character.server, character.nickname,
 				character.server, character.firstName, character.lastName, character.guildRank, character.guildRankName, character.level,
-				character.profession, character.professionTitle, character.gender, character.breed, character.defenderRank,
-				character.defenderRankName, character.guildId)
+				character.faction, character.profession, character.professionTitle, character.gender, character.breed,
+				character.defenderRank, character.defenderRankName, character.guildId)
 		
 		val resultSet = statement.executeQuery()
 		if (!resultSet.next()) {
@@ -81,16 +82,16 @@ object CharacterDao {
 		val sql =
 			"INSERT INTO player (" +
 				"nickname, first_name, last_name, guild_rank, guild_rank_name, " +
-				"level, profession, profession_title, gender, breed, " +
+				"level, faction, profession, profession_title, gender, breed, " +
 				"defender_rank, defender_rank_name, guild_id, server, " +
 				"last_checked, last_changed " +
 			") VALUES (" +
-				"?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?" +
+				"?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?" +
 			")";
 		
 		val statement = Database.prepareStatement(connection, sql, character.nickname, character.firstName, character.lastName, character.guildRank,
-				character.guildRankName, character.level, character.profession, character.professionTitle, character.gender, character.breed,
-				character.defenderRank, character.defenderRankName, character.guildId, character.server, time, time)
+				character.guildRankName, character.level, character.faction, character.profession, character.professionTitle, character.gender,
+				character.breed, character.defenderRank, character.defenderRankName, character.guildId, character.server, time, time)
 		
 		statement.executeUpdate()
 		statement.close()
