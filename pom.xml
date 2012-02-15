@@ -11,7 +11,7 @@
 			<artifactId>log4j</artifactId>
 			<version>1.2.16</version>
 		</dependency>
-		<dependency>
+		<!-- <dependency>
 			<groupId>org.hibernate</groupId>
 			<artifactId>hibernate-core</artifactId>
 			<version>3.6.8.Final</version>
@@ -22,10 +22,15 @@
 			<version>3.6.8.Final</version>
 		</dependency>
 		<dependency>
+	    	<groupId>com.pigirlittle</groupId>
+	    	<artifactId>HibernateSQLite</artifactId>
+	    	<version>1.0</version>
+	    </dependency>
+		<dependency>
 			<groupId>org.xerial</groupId>
 			<artifactId>sqlite-jdbc</artifactId>
 			<version>3.7.2</version>
-	    </dependency>
+	    </dependency> -->
 	    <dependency>
 			<groupId>mysql</groupId>
 			<artifactId>mysql-connector-java</artifactId>
@@ -37,9 +42,159 @@
 	    	<version>20110725-1953-1.2.15</version>
 	    </dependency>
 	    <dependency>
-	    	<groupId>com.pigirlittle</groupId>
-	    	<artifactId>HibernateSQLite</artifactId>
-	    	<version>1.0</version>
-	    </dependency>
+			<groupId>org.scala-lang</groupId>
+			<artifactId>scala-library</artifactId>
+			<version>2.9.1</version>
+		</dependency>
+		<dependency>
+			<groupId>com.jkbff</groupId>
+			<artifactId>tyrlib</artifactId>
+			<version>1.0</version>
+		</dependency>
 	</dependencies>
+	
+	<build>
+		<plugins>
+			<!-- <plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-jar-plugin</artifactId>
+				<version>2.1</version>
+ 				<configuration>
+					<archive>
+						<manifest>
+							<addClasspath>true</addClasspath>
+							<classpathMavenRepositoryLayout/>
+							<classpathPrefix/>
+							<customClasspathLayout/>
+							<mainClass/>
+							<packageName/>
+						</manifest>
+					</archive>
+				</configuration>
+			</plugin> -->
+			<plugin>
+		        <artifactId>maven-resources-plugin</artifactId>
+		        <version>2.5</version>
+		        <executions>
+		          <execution>
+		            <id>copy-resources</id>
+		            <!-- here the phase you need -->
+		            <phase>package</phase>
+		            <goals>
+		              <goal>copy-resources</goal>
+		            </goals>
+		            <configuration>
+		              <outputDirectory>${project.build.directory}/release</outputDirectory>
+		              <resources>          
+		                <resource>
+		                  <directory>src/main/config</directory>
+		                  <filtering>true</filtering>
+		                </resource>
+		              </resources>              
+		            </configuration>            
+		          </execution>
+		        </executions>
+		    </plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+			    <artifactId>maven-dependency-plugin</artifactId>
+			    <executions>
+			    	<execution>
+			    		<id>copy-dependencies</id>
+						<phase>package</phase>
+						<goals>
+							<goal>copy-dependencies</goal>
+						</goals>
+					    <configuration>
+					    	<outputDirectory>
+					     		${project.build.directory}/release/lib
+					     	</outputDirectory>
+					     </configuration>
+					</execution>
+			    </executions>
+			</plugin>
+			<plugin>
+				  <groupId>org.codehaus.mojo</groupId>
+				  <artifactId>build-helper-maven-plugin</artifactId>
+				  <version>1.7</version>
+				  <executions>
+				    <execution>
+				      <id>add-source</id>
+				      <phase>generate-sources</phase>
+				      <goals>
+				        <goal>add-source</goal>
+				      </goals>
+				      <configuration>
+				        <sources>
+				          <source>${basedir}/src/main/scala</source>
+				        </sources>
+				      </configuration>
+				    </execution>
+				    <execution>
+				      <id>add-test-source</id>
+				      <phase>generate-sources</phase>
+				      <goals>
+				        <goal>add-test-source</goal>
+				      </goals>
+				      <configuration>
+				        <sources>
+				          <source>${basedir}/src/test/scala</source>
+				        </sources>
+				      </configuration>
+				    </execution>
+				  </executions>
+			</plugin>
+			<plugin>
+            	<groupId>org.scala-tools</groupId>
+               	<artifactId>maven-scala-plugin</artifactId>
+ 
+                <executions>
+                    <execution>
+                        <id>compile</id>
+                        <goals>
+                        	<goal>compile</goal>
+                        </goals>
+                        <phase>compile</phase>
+                    </execution>
+ 
+                    <execution>
+                        <id>test-compile</id>
+                        <goals>
+                        	<goal>testCompile</goal>
+                        </goals>
+                        <phase>test-compile</phase>
+                    </execution>
+ 
+                    <execution>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>compile</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+			<!-- <plugin>
+		        <groupId>org.codehaus.mojo</groupId>
+		        <artifactId>appassembler-maven-plugin</artifactId>
+		        <version>1.2</version>
+		        <configuration>
+					<programs>
+						<program>
+							<mainClass>com.jkbff.ao.playerinfoscraper.ScalaEntryPoint</mainClass>
+							<name>porkmirror</name>
+						</program>
+					</programs>
+					<binFileExtensions>
+						<unix>.sh</unix>
+					</binFileExtensions>
+					<copyConfigurationDirectory>true</copyConfigurationDirectory>
+					<repositoryLayout>flat</repositoryLayout>
+					<configurationSourceDirectory>src/main/resources</configurationSourceDirectory>
+					<includeConfigurationDirectoryInClasspath>false</includeConfigurationDirectoryInClasspath>
+					<configurationDirectory>${project.build.directory}/appassembler</configurationDirectory>
+					<repositoryName>lib</repositoryName>
+		        </configuration>
+			</plugin> -->
+		</plugins>
+	</build>
 </project>

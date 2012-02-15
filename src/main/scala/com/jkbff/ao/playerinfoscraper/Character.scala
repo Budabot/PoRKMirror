@@ -1,16 +1,7 @@
 package com.jkbff.ao.playerinfoscraper
-import javax.persistence.Entity
-import javax.persistence.GeneratedValue
-import javax.persistence.Id
-import javax.persistence.JoinColumn
-import javax.persistence.OneToOne
-import javax.persistence.FetchType
-import javax.persistence.JoinColumns
-import javax.persistence.IdClass
-import javax.persistence.Table
-import scala.xml.Node
-import javax.persistence.Transient
 import java.sql.ResultSet
+
+import scala.xml.Node
 
 class Character(
 		val nickname: String,

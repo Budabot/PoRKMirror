@@ -1,5 +1,8 @@
 package com.jkbff.ao.playerinfoscraper
+
 import java.io.IOException
+import java.util.concurrent.atomic.AtomicInteger
+
 import scala.annotation.tailrec
 import scala.io.Source
 import scala.util.matching.Regex.Match
@@ -7,16 +10,12 @@ import scala.util.matching.Regex
 import scala.xml.Elem
 import scala.xml.Node
 import scala.xml.XML
+
 import org.apache.log4j.Logger
 import org.apache.log4j.PropertyConfigurator
-import scala.None
-import javax.persistence.EntityManager
-import javax.persistence.PersistenceUnit
-import javax.persistence.Persistence
 import org.xml.sax.SAXParseException
-import javax.persistence.EntityManagerFactory
-import java.util.concurrent.atomic.AtomicInteger
 
+import scala.None
 
 object Program {
 	
