@@ -33,6 +33,7 @@ object Program {
 			Program.run
 		} catch {
 			case e => log.error("Could not finish retrieving info", e)
+			e.printStackTrace()
 		}
 	}
 	
