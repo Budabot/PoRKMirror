@@ -24,8 +24,8 @@
 	    <level value="INFO" />
 	</logger>
 
-	<root> 
-		<priority value="DEBUG" /> 
+	<root>
+		<level value="INFO" /> 
 		<!-- <appender-ref ref="console" /> -->
 		<appender-ref ref="file" />
 	</root>
