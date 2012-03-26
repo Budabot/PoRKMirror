@@ -40,11 +40,11 @@
 			<artifactId>mysql-connector-java</artifactId>
 			<version>5.1.18</version>
 		</dependency>
-		<!-- C:\>mvn install:install-file -Dfile=c:\log4j-rolling-appender-20110725-1953-1.2.15.jar -DgroupId=uk.org.simonsite -DartifactId=log4j-appender -Dversion=20110725-1953-1.2.15 -Dpackaging=jar -->
+		<!-- C:\>mvn install:install-file -Dfile=c:\log4j-rolling-appender-20120206-1607-1.2.15.jar -DgroupId=uk.org.simonsite -DartifactId=log4j-rolling-appender -Dversion=20120206-1607-1.2.15 -Dpackaging=jar -->
 	    <dependency>
 	    	<groupId>uk.org.simonsite</groupId>
-	    	<artifactId>log4j-appender</artifactId>
-	    	<version>20110725-1953-1.2.15</version>
+	    	<artifactId>log4j-rolling-appender</artifactId>
+	    	<version>20120206-1607-1.2.15</version>
 	    </dependency>
 	    <dependency>
 			<groupId>org.scala-lang</groupId>
