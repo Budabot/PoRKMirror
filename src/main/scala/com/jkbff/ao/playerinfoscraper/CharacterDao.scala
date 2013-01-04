@@ -2,6 +2,7 @@ package com.jkbff.ao.playerinfoscraper
 import java.sql.Connection
 import java.sql.ResultSet
 import scala.annotation.tailrec
+import scala.io.Source
 
 object CharacterDao {
 	def save(connection: Connection, character: Character, time: Long) {
@@ -21,7 +22,7 @@ object CharacterDao {
 				"p1.breed = ? AND " +
 				"p1.defender_rank = ? AND " +
 				"p1.defender_rank_name = ? AND " +
-				"p1.guild_id = ?";
+				"p1.guild_id = ?"
 		
 		val statement = Database.prepareStatement(connection, sql, character.nickname, character.server, character.nickname,
 				character.server, character.firstName, character.lastName, character.guildRank, character.guildRankName, character.level,
@@ -43,7 +44,7 @@ object CharacterDao {
 			"SELECT * FROM player p " +
 				"JOIN (SELECT nickname, server, MAX(last_checked) AS max_last_checked FROM player WHERE server = ? AND guild_id = ? GROUP BY nickname, server) t " +
 					"ON p.nickname = t.nickname AND p.server = t.server AND p.last_checked = t.max_last_checked " +
-			"WHERE p.server = ? AND p.guild_id = ? AND p.last_checked <> ?";
+			"WHERE p.server = ? AND p.guild_id = ? AND p.last_checked <> ?"
 		
 		val statement = Database.prepareStatement(connection, sql, orgInfo.server, orgInfo.guildId, orgInfo.server, orgInfo.guildId, time)
 
@@ -67,7 +68,7 @@ object CharacterDao {
 	private def updateLastChecked(connection: Connection, character: Character, time: Long): Int = {
 		val sql = "UPDATE player SET last_checked = ? " +
 				"WHERE nickname = ? AND server = ? " +
-				"AND last_checked = (SELECT max_last_checked FROM (SELECT max(last_checked) AS max_last_checked FROM player WHERE nickname = ? and server = ?) t)";
+				"AND last_checked = (SELECT max_last_checked FROM (SELECT max(last_checked) AS max_last_checked FROM player WHERE nickname = ? and server = ?) t)"
 		
 		val statement = Database.prepareStatement(connection, sql, time, character.nickname, character.server, character.nickname, character.server)
 
@@ -87,11 +88,19 @@ object CharacterDao {
 				"last_checked, last_changed " +
 			") VALUES (" +
 				"?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?" +
-			")";
+			")"
 		
 		val statement = Database.prepareStatement(connection, sql, character.nickname, character.firstName, character.lastName, character.guildRank,
 				character.guildRankName, character.level, character.faction, character.profession, character.professionTitle, character.gender,
 				character.breed, character.defenderRank, character.defenderRankName, character.guildId, character.server, time, time)
+		
+		statement.executeUpdate()
+		statement.close()
+	}
+	
+	def createTable(connection: Connection) {
+		val sql = Source.fromURL(getClass().getClassLoader().getResource("player.sql")).mkString
+		val statement = Database.prepareStatement(connection, sql)
 		
 		statement.executeUpdate()
 		statement.close()

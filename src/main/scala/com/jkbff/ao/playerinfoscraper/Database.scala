@@ -46,7 +46,7 @@ object Database {
 	def logQuery(sql: String, params: Any*) {
 		var newSql = sql
 		params.foreach( x => {
-			newSql = newSql.replaceFirst("\\?", "'" + Matcher.quoteReplacement(x.toString()) + "'")
+			newSql = newSql.replaceFirst("\\?", "'" + Matcher.quoteReplacement(if (x == null) "null" else x.toString()) + "'")
 		})
 		log.debug(newSql)
 	}

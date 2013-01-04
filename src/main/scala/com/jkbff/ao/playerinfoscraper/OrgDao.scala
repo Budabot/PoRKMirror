@@ -1,5 +1,6 @@
 package com.jkbff.ao.playerinfoscraper
 import java.sql.Connection
+import scala.io.Source
 
 object OrgDao {
 	def save(connection: Connection, orgInfo: OrgInfo, time: Long) {
@@ -43,8 +44,15 @@ object OrgDao {
 				"?,?,?,?,?,?" +
 			")";
 
-		val statement = Database.prepareStatement(connection, sql, orgInfo.guildId, orgInfo.guildName, orgInfo.faction, orgInfo.server,
-				time, time)
+		val statement = Database.prepareStatement(connection, sql, orgInfo.guildId, orgInfo.guildName, orgInfo.faction, orgInfo.server, time, time)
+		
+		statement.executeUpdate()
+		statement.close()
+	}
+	
+	def createTable(connection: Connection) {
+		val sql = Source.fromURL(getClass().getClassLoader().getResource("guild.sql")).mkString
+		val statement = Database.prepareStatement(connection, sql)
 		
 		statement.executeUpdate()
 		statement.close()

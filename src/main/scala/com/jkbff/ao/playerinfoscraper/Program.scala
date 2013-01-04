@@ -17,7 +17,7 @@ import org.xml.sax.SAXParseException
 
 import scala.None
 
-object Program {
+object Program extends App {
 	
 	private val log = Logger.getLogger(Program.getClass())
 	
@@ -25,16 +25,14 @@ object Program {
 	
 	//val emf: EntityManagerFactory = Persistence.createEntityManagerFactory("playerinfo")
 
-	def main(args: Array[String]): Unit = {
-		// initialize the log4j component
-		PropertyConfigurator.configure("log4j.xml")
-		
-		try {
-			Program.run
-		} catch {
-			case e => log.error("Could not finish retrieving info", e)
-			e.printStackTrace()
-		}
+	// initialize the log4j component
+	PropertyConfigurator.configure("log4j.xml")
+	
+	try {
+		Program.run
+	} catch {
+		case e => log.error("Could not finish retrieving info", e)
+		e.printStackTrace()
 	}
 	
 	def run = {
@@ -46,18 +44,25 @@ object Program {
 		//val letters = List("q")
 
 		var orgInfoList = List[OrgInfo]()
-		letters.foreach(letter => {
+		letters.foreach{letter =>
 			updateDisplay("Grabbing orgs that start with: '" + letter + "'")
 			grabPage(orgNameUrl.format(letter)) match {
 				case Some(page) => orgInfoList = pullOrgInfoFromPage(page) ::: orgInfoList
 				case None => log.error("Could not load info for letter: " + letter)
 			}
-		})
+		}
+		
+//		Helper.using(Database.getConnection()) { connection =>
+//			OrgDao.createTable(connection)
+//			CharacterDao.createTable(connection)
+//		}
+		
+		//orgInfoList = List(new OrgInfo(11366406, "Very Bad Things",1))
 
 		var numGuildsSuccess = new AtomicInteger(0)
 		var numGuildsFailure = new AtomicInteger(0)
 		var numCharacters = new AtomicInteger(0)
-		orgInfoList.par.foreach(orgInfo => {
+		orgInfoList.par.foreach{ orgInfo =>
 			val orgInfoOption = retrieveOrgRoster(orgInfo)
 			if (orgInfoOption.isDefined) {
 				numCharacters.addAndGet(orgInfoOption.get.size)
@@ -67,11 +72,11 @@ object Program {
 				numGuildsFailure.addAndGet(1)
 			}
 			updateGuildDisplay(numGuildsSuccess.get, numGuildsFailure.get, orgInfoList.size)
-		})
+		}
 		
-		orgInfoList.par.foreach(orgInfo => {
+		orgInfoList.par.foreach{ orgInfo =>
 			updateRemovedGuildMembers(orgInfo, startTime)
-		})
+		}
 		
 		val elapsedTime = "Elapsed time: " + ((System.currentTimeMillis - startTime.toDouble) / 1000) + "s"
 		val numCharactersParsed = "Characters parsed: " + numCharacters
@@ -84,19 +89,17 @@ object Program {
 	
 	def updateRemovedGuildMembers(orgInfo: OrgInfo, time: Long) {
 		log.debug("Removing guild members for guild: " + orgInfo)
-		Helper.using(Database.getConnection()) {
-			connection => {
-				connection.setAutoCommit(false)
-				var characters = CharacterDao.findUnupdatedGuildMembers(connection, orgInfo, time)
-				characters.foreach(x => {
-					val character = new Character(x.nickname, x.firstName, x.lastName, x.guildRank, x.guildRankName, x.level,
-							orgInfo.faction, x.profession, x.professionTitle, x.gender, x.breed, x.defenderRank, x.defenderRankName,
-							0, x.server, 0, 0)
-					CharacterDao.addHistory(connection, character, time)
-				})
-				connection.commit()
-				connection.setAutoCommit(true)
+		Helper.using(Database.getConnection()) { connection =>
+			connection.setAutoCommit(false)
+			var characters = CharacterDao.findUnupdatedGuildMembers(connection, orgInfo, time)
+			characters.foreach { x =>
+				val character = new Character(x.nickname, x.firstName, x.lastName, x.guildRank, x.guildRankName, x.level,
+						orgInfo.faction, x.profession, x.professionTitle, x.gender, x.breed, x.defenderRank, x.defenderRankName,
+						0, x.server, 0, 0)
+				CharacterDao.addHistory(connection, character, time)
 			}
+			connection.commit()
+			connection.setAutoCommit(true)
 		}
 	}
 	
