@@ -37,6 +37,7 @@ object Database {
 				case s: String => statement.setString(count, s)
 				case i: Int => statement.setInt(count, i)
 				case l: Long => statement.setLong(count, l)
+				case a => statement.setObject(count, a)
 			}
 		})
 		
@@ -44,10 +45,12 @@ object Database {
 	}
 	
 	def logQuery(sql: String, params: Any*) {
-		var newSql = sql
-		params.foreach( x => {
-			newSql = newSql.replaceFirst("\\?", "'" + Matcher.quoteReplacement(if (x == null) "null" else x.toString()) + "'")
-		})
-		log.debug(newSql)
+		if (log.isDebugEnabled()) {
+			var newSql = sql
+			params.foreach( x => {
+				newSql = newSql.replaceFirst("\\?", "'" + Matcher.quoteReplacement(if (x == null) "null" else x.toString()) + "'")
+			})
+			log.debug(newSql)
+		}
 	}
 }
