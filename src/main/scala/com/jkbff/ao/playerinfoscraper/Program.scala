@@ -41,35 +41,41 @@ object Program extends App {
 		val letters = List("a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "others")
 		//val letters = List("o")
 
-		var orgInfoList = List[OrgInfo]()
-		letters.foreach{letter =>
+		val orgInfoList = letters.foldLeft (List[OrgInfo]()) { (list, letter) =>
 			updateDisplay("Grabbing orgs that start with: '" + letter + "'")
 			grabPage(orgNameUrl.format(letter)) match {
-				case Some(page) => orgInfoList = pullOrgInfoFromPage(page) ::: orgInfoList
-				case None => log.error("Could not load info for letter: " + letter)
+				case Some(page) => {
+					pullOrgInfoFromPage(page) ::: list
+				}
+				case None => {
+					log.error("Could not load info for letter: " + letter)
+					list
+				}
 			}
 		}
 		
-		/*Helper.using(Database.getConnection()) { connection =>
+		Helper.using(Database.getConnection()) { connection =>
 			OrgDao.createTable(connection)
 			CharacterDao.createTable(connection)
-		}*/
+		}
 		
 		//orgInfoList = List(new OrgInfo(11366406, "Very Bad Things",1))
 		
-		var numGuildsSuccess = new AtomicInteger(0)
-		var numGuildsFailure = new AtomicInteger(0)
-		var numCharacters = new AtomicInteger(0)
+		val numGuildsSuccess = new AtomicInteger(0)
+		val numGuildsFailure = new AtomicInteger(0)
+		val numCharacters = new AtomicInteger(0)
 		val parOrgInfoList = orgInfoList.par
 		parOrgInfoList.tasksupport = new ForkJoinTaskSupport(new scala.concurrent.forkjoin.ForkJoinPool(8))
 		parOrgInfoList.foreach{ orgInfo =>
-			val orgInfoOption = retrieveOrgRoster(orgInfo)
-			if (orgInfoOption.isDefined) {
-				numCharacters.addAndGet(orgInfoOption.get.size)
-				save(orgInfo, orgInfoOption.get, startTime)
-				numGuildsSuccess.addAndGet(1)
-			} else {
-				numGuildsFailure.addAndGet(1)
+			retrieveOrgRoster(orgInfo) match {
+				case Some(orgRoster) => {
+					numCharacters.addAndGet(orgRoster.size)
+					save(orgInfo, orgRoster, startTime)
+					numGuildsSuccess.addAndGet(1)
+				}
+				case None => {
+					numGuildsFailure.addAndGet(1)
+				}
 			}
 			updateGuildDisplay(numGuildsSuccess.get, numGuildsFailure.get, orgInfoList.size)
 		}
@@ -99,7 +105,7 @@ object Program extends App {
 		log.debug("Removing guild members for guild: " + orgInfo)
 		Helper.using(Database.getConnection()) { connection =>
 			connection.setAutoCommit(false)
-			var characters = CharacterDao.findUnupdatedGuildMembers(connection, orgInfo, time)
+			val characters = CharacterDao.findUnupdatedGuildMembers(connection, orgInfo, time)
 			characters.foreach { x =>
 				val character = new Character(x.nickname, x.firstName, x.lastName, x.guildRank, x.guildRankName, x.level,
 						orgInfo.faction, x.profession, x.professionTitle, x.gender, x.breed, x.defenderRank, x.defenderRankName,
@@ -157,7 +163,7 @@ object Program extends App {
 	def pullOrgInfoFromPage(page: String) = {
 		log.debug("Processing page...")
 		val pattern = """(?s)<a href="http://people.anarchy-online.com/org/stats/d/(\d)/name/(\d+)">(.+?)</a>""".r
-		var orgInfoList = List[OrgInfo]()
+		val orgInfoList = List[OrgInfo]()
 		
 		pullOrgInfo(pattern.findAllIn(page).matchData)
 	}
@@ -174,7 +180,7 @@ object Program extends App {
 	
 	def grabPage(url: String): Option[String] = {
 		for (x <- 1 to 10) {
-			log.debug("Attempt " + x + " at grabbing page: " + url)
+			log.info("Attempt " + x + " at grabbing page: " + url)
 			try {
 				return Some(Source.fromURL(url)("iso-8859-15").mkString)
 			} catch {
