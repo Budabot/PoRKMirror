@@ -30,15 +30,14 @@ object Database {
 		
 		val statement = connection.prepareStatement(sql)
 		
-		var count = 0
-		params.foreach( x => {
-			count += 1
+		params.foldLeft(1) ( (count, x) => {
 			x match {
 				case s: String => statement.setString(count, s)
 				case i: Int => statement.setInt(count, i)
 				case l: Long => statement.setLong(count, l)
 				case a => statement.setObject(count, a)
 			}
+			count + 1
 		})
 		
 		statement
@@ -46,9 +45,8 @@ object Database {
 	
 	def logQuery(sql: String, params: Any*) {
 		if (log.isDebugEnabled()) {
-			var newSql = sql
-			params.foreach( x => {
-				newSql = newSql.replaceFirst("\\?", "'" + Matcher.quoteReplacement(if (x == null) "null" else x.toString()) + "'")
+			val newSql = params.foldLeft(sql) ( (str, x) => {
+				str.replaceFirst("\\?", "'" + Matcher.quoteReplacement(if (x == null) "null" else x.toString()) + "'")
 			})
 			log.debug(newSql)
 		}

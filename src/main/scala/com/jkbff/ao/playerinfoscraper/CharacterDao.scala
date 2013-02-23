@@ -9,7 +9,6 @@ object CharacterDao {
 		val sql = "SELECT 1 FROM player p1 WHERE " +
 				"p1.nickname = ? AND " +
 				"p1.server = ? AND " +
-				"p1.last_checked = (SELECT MAX(last_checked) FROM player p2 WHERE p2.nickname = ? and p2.server = ?) AND " + 
 				"p1.first_name = ? AND " +
 				"p1.last_name = ? AND " +
 				"p1.guild_rank = ? AND " +
@@ -24,13 +23,14 @@ object CharacterDao {
 				"p1.defender_rank_name = ? AND " +
 				"p1.guild_id = ?"
 		
-		val statement = Database.prepareStatement(connection, sql, character.nickname, character.server, character.nickname,
-				character.server, character.firstName, character.lastName, character.guildRank, character.guildRankName, character.level,
+		val statement = Database.prepareStatement(connection, sql, character.nickname, character.server,
+				character.firstName, character.lastName, character.guildRank, character.guildRankName, character.level,
 				character.faction, character.profession, character.professionTitle, character.gender, character.breed,
 				character.defenderRank, character.defenderRankName, character.guildId)
 		
 		val resultSet = statement.executeQuery()
 		if (!resultSet.next()) {
+			updateInfo(connection, character, time)
 			addHistory(connection, character, time)
 		} else {
 			updateLastChecked(connection, character, time)
@@ -42,11 +42,9 @@ object CharacterDao {
 	def findUnupdatedGuildMembers(connection: Connection, orgInfo: OrgInfo, time: Long): List[Character] = {
 		val sql = 
 			"SELECT * FROM player p " +
-				"JOIN (SELECT nickname, server, MAX(last_checked) AS max_last_checked FROM player WHERE server = ? AND guild_id = ? GROUP BY nickname, server) t " +
-					"ON p.nickname = t.nickname AND p.server = t.server AND p.last_checked = t.max_last_checked " +
 			"WHERE p.server = ? AND p.guild_id = ? AND p.last_checked <> ?"
 		
-		val statement = Database.prepareStatement(connection, sql, orgInfo.server, orgInfo.guildId, orgInfo.server, orgInfo.guildId, time)
+		val statement = Database.prepareStatement(connection, sql, orgInfo.server, orgInfo.guildId,time)
 
 		val resultSet = statement.executeQuery()
 		val characters = retrieveResultSet(resultSet)
@@ -67,10 +65,9 @@ object CharacterDao {
 	
 	private def updateLastChecked(connection: Connection, character: Character, time: Long): Int = {
 		val sql = "UPDATE player SET last_checked = ? " +
-				"WHERE nickname = ? AND server = ? " +
-				"AND last_checked = (SELECT max_last_checked FROM (SELECT max(last_checked) AS max_last_checked FROM player WHERE nickname = ? and server = ?) t)"
+				"WHERE nickname = ? AND server = ?"
 		
-		val statement = Database.prepareStatement(connection, sql, time, character.nickname, character.server, character.nickname, character.server)
+		val statement = Database.prepareStatement(connection, sql, time, character.nickname, character.server)
 
 		val numRows = statement.executeUpdate()
 
@@ -81,7 +78,7 @@ object CharacterDao {
 	
 	def addHistory(connection: Connection, character: Character, time: Long) {
 		val sql =
-			"INSERT INTO player (" +
+			"INSERT INTO player_history (" +
 				"nickname, first_name, last_name, guild_rank, guild_rank_name, " +
 				"level, faction, profession, profession_title, gender, breed, " +
 				"defender_rank, defender_rank_name, guild_id, server, " +
@@ -96,6 +93,31 @@ object CharacterDao {
 		
 		statement.executeUpdate()
 		statement.close()
+	}
+	
+	def updateInfo(connection: Connection, character: Character, time: Long) {
+		val deleteSql = "DELETE FROM player WHERE nickname = ? AND server = ?"
+		Helper.using(Database.prepareStatement(connection, deleteSql, character.nickname, character.server)) { stmt =>
+			stmt.execute
+		}
+		
+		val sql =
+			"INSERT INTO player (" +
+				"nickname, first_name, last_name, guild_rank, guild_rank_name, " +
+				"level, faction, profession, profession_title, gender, breed, " +
+				"defender_rank, defender_rank_name, guild_id, server, " +
+				"last_checked, last_changed " +
+			") VALUES (" +
+				"?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?" +
+			")"
+		
+		val statement = Database.prepareStatement(connection, sql, character.nickname, character.firstName, character.lastName, character.guildRank,
+				character.guildRankName, character.level, character.faction, character.profession, character.professionTitle, character.gender,
+				character.breed, character.defenderRank, character.defenderRankName, character.guildId, character.server, time, time)
+			
+		Helper.using(statement) { stmt =>
+			stmt.executeUpdate()
+		}
 	}
 	
 	def createTable(connection: Connection) {

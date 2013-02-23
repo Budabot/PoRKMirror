@@ -39,8 +39,9 @@ object Program extends App {
 		val orgNameUrl = "http://people.anarchy-online.com/people/lookup/orgs.html?l=%s"
 		
 		val letters = List("a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "others")
-		//val letters = List("o")
+		//val letters = List("o", "o")
 
+		//val orgInfoList = List(new OrgInfo(5593094, "Devil Inside", 2))
 		val orgInfoList = letters.foldLeft (List[OrgInfo]()) { (list, letter) =>
 			updateDisplay("Grabbing orgs that start with: '" + letter + "'")
 			grabPage(orgNameUrl.format(letter)) match {
@@ -54,12 +55,10 @@ object Program extends App {
 			}
 		}
 		
-		Helper.using(Database.getConnection()) { connection =>
-			OrgDao.createTable(connection)
-			CharacterDao.createTable(connection)
-		}
-		
-		//orgInfoList = List(new OrgInfo(11366406, "Very Bad Things",1))
+//		Helper.using(Database.getConnection()) { connection =>
+//			OrgDao.createTable(connection)
+//			CharacterDao.createTable(connection)
+//		}
 		
 		val numGuildsSuccess = new AtomicInteger(0)
 		val numGuildsFailure = new AtomicInteger(0)
@@ -119,14 +118,14 @@ object Program extends App {
 	
 	def save(orgInfo: OrgInfo, characters: List[Character], time: Long) = {
 		log.debug("Saving guild members for guild: " + orgInfo)
-		Helper.using(Database.getConnection()) {
-			connection => {
-				connection.setAutoCommit(false)
-				OrgDao.save(connection, orgInfo, time)
-				characters.foreach(x => CharacterDao.save(connection, x, time))
-				connection.commit()
-				connection.setAutoCommit(true)
+		Helper.using(Database.getConnection()) { connection =>
+			connection.setAutoCommit(false)
+			OrgDao.save(connection, orgInfo, time)
+			characters.foreach{ x =>
+				CharacterDao.save(connection, x, time)
 			}
+			connection.commit()
+			connection.setAutoCommit(true)
 		}
 	}
 	

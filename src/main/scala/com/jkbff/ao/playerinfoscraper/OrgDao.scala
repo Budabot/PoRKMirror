@@ -16,6 +16,7 @@ object OrgDao {
 		
 		val resultSet = statement.executeQuery()
 		if (!resultSet.next()) {
+			updateInfo(connection, orgInfo, time)
 			addHistory(connection, orgInfo, time)
 		} else {
 			updateLastChecked(connection, orgInfo, time)
@@ -38,7 +39,7 @@ object OrgDao {
 	
 	private def addHistory(connection: Connection, orgInfo: OrgInfo, time: Long) {
 		val sql =
-			"INSERT INTO guild (" +
+			"INSERT INTO guild_history (" +
 				"guild_id, guild_name, faction, server, last_checked, last_changed" +
 			") VALUES (" +
 				"?,?,?,?,?,?" +
@@ -48,6 +49,26 @@ object OrgDao {
 		
 		statement.executeUpdate()
 		statement.close()
+	}
+	
+	private def updateInfo(connection: Connection, orgInfo: OrgInfo, time: Long) {
+		val deleteSql = "DELETE FROM guild WHERE guild_id = ? AND server = ?"
+		Helper.using(Database.prepareStatement(connection, deleteSql, orgInfo.guildId, orgInfo.server)) { stmt =>
+			stmt.execute
+		}
+		
+		val sql =
+			"INSERT INTO guild (" +
+				"guild_id, guild_name, faction, server, last_checked, last_changed" +
+			") VALUES (" +
+				"?,?,?,?,?,?" +
+			")";
+
+		val statement = Database.prepareStatement(connection, sql, orgInfo.guildId, orgInfo.guildName, orgInfo.faction, orgInfo.server, time, time)
+		
+		Helper.using(statement) { stmt =>
+			stmt.executeUpdate()
+		}
 	}
 	
 	def createTable(connection: Connection) {

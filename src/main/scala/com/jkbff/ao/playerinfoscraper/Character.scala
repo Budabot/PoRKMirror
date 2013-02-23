@@ -50,5 +50,5 @@ class Character(
 		return true
 	}
 
-	override def toString = firstName + " \"" + nickname + "\" " + lastName + ", " + guildRankName + ", " + server
+	override def toString = firstName + " \"" + nickname + "\" " + lastName + ", " + faction + ", "  + guildRankName + ", " + server
 }
