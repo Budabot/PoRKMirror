@@ -12,13 +12,10 @@ object Database {
 	private val log = Logger.getLogger(Program.getClass())
 	
 	def getConnection(): Connection = {
-		val properties = new Properties();
-		properties.load(new FileInputStream("config.properties"));
-
-		val driver = properties.getProperty("driver")
-	    val url = properties.getProperty("connectionString")
-	    val username = properties.getProperty("username")
-	    val password = properties.getProperty("password")
+		val driver = Program.properties.getProperty("driver")
+	    val url = Program.properties.getProperty("connectionString")
+	    val username = Program.properties.getProperty("username")
+	    val password = Program.properties.getProperty("password")
 
 		// make the connection
 		Class.forName(driver)

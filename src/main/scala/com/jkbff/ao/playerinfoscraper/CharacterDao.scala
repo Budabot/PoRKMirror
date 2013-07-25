@@ -44,7 +44,22 @@ object CharacterDao {
 			"SELECT * FROM player p " +
 			"WHERE p.server = ? AND p.guild_id = ? AND p.last_checked <> ?"
 		
-		val statement = Database.prepareStatement(connection, sql, orgInfo.server, orgInfo.guildId,time)
+		val statement = Database.prepareStatement(connection, sql, orgInfo.server, orgInfo.guildId, time)
+
+		val resultSet = statement.executeQuery()
+		val characters = retrieveResultSet(resultSet)
+
+		statement.close()
+		
+		characters
+	}
+	
+	def findUnupdatedMembers(connection: Connection, server: Int, time: Long): List[Character] = {
+		val sql = 
+			"SELECT * FROM player p " +
+			"WHERE p.server = ? AND p.last_checked <> ?"
+		
+		val statement = Database.prepareStatement(connection, sql, server, time)
 
 		val resultSet = statement.executeQuery()
 		val characters = retrieveResultSet(resultSet)

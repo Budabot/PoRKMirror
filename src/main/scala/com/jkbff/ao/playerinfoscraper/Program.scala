@@ -14,15 +14,21 @@ import org.apache.log4j.PropertyConfigurator
 import org.xml.sax.SAXParseException
 import scala.None
 import scala.collection.parallel.ForkJoinTaskSupport
+import java.util.Properties
+import java.io.FileInputStream
+import java.sql.Connection
 
 object Program extends App {
 	
-	private val log = Logger.getLogger(Program.getClass())
+	private val log = Logger.getLogger(getClass())
+	
+	val properties = new Properties();
+	properties.load(new FileInputStream("config.properties"));
+	
+	val playerUrl = "http://people.anarchy-online.com/character/bio/d/%d/name/%s/bio.xml"
 	
 	var longestLength = 0
 	
-	//val emf: EntityManagerFactory = Persistence.createEntityManagerFactory("playerinfo")
-
 	// initialize the log4j component
 	PropertyConfigurator.configure("log4j.xml")
 	
@@ -38,8 +44,9 @@ object Program extends App {
 		
 		val orgNameUrl = "http://people.anarchy-online.com/people/lookup/orgs.html?l=%s"
 		
-		val letters = List("a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "others")
+		//val letters = List("a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "others")
 		//val letters = List("o", "o")
+		val letters = List("q")
 
 		//val orgInfoList = List(new OrgInfo(5593094, "Devil Inside", 2))
 		val orgInfoList = letters.foldLeft (List[OrgInfo]()) { (list, letter) =>
@@ -55,10 +62,12 @@ object Program extends App {
 			}
 		}
 		
-//		Helper.using(Database.getConnection()) { connection =>
-//			OrgDao.createTable(connection)
-//			CharacterDao.createTable(connection)
-//		}
+		if (properties.getProperty("create_tables") == "true") {
+			Helper.using(Database.getConnection()) { connection =>
+				OrgDao.createTable(connection)
+				CharacterDao.createTable(connection)
+			}
+		}
 		
 		val numGuildsSuccess = new AtomicInteger(0)
 		val numGuildsFailure = new AtomicInteger(0)
@@ -79,9 +88,11 @@ object Program extends App {
 			updateGuildDisplay(numGuildsSuccess.get, numGuildsFailure.get, orgInfoList.size)
 		}
 		
-		orgInfoList.foreach{ orgInfo =>
+		/*orgInfoList.foreach{ orgInfo =>
 			updateRemovedGuildMembers(orgInfo, startTime)
-		}
+		}*/
+		
+		numCharacters.addAndGet(updateUnguildedPlayers(5, startTime));
 		
 		val elapsedTime = "Elapsed time: " + ((System.currentTimeMillis - startTime.toDouble) / 1000) + "s"
 		val numCharactersParsed = "Characters parsed: " + numCharacters
@@ -93,6 +104,62 @@ object Program extends App {
 		println
 		println(elapsedTime)
 		println(numCharactersParsed)
+	}
+	
+	def updateUnguildedPlayers(server: Int, time: Long): Int = {
+		val numUpdated = new AtomicInteger(0)
+		Helper.using(Database.getConnection()) { connection =>
+			val list = CharacterDao.findUnupdatedMembers(connection, server, time)
+			//list.tasksupport = new ForkJoinTaskSupport(new scala.concurrent.forkjoin.ForkJoinPool(8))
+			list.foreach { x =>
+				if (updateSinglePlayer(connection, server, x.nickname, time)) {
+					numUpdated.addAndGet(1)
+				}
+			}
+		}
+		numUpdated.intValue()
+	}
+	
+	def updateSinglePlayer(connection: Connection, server: Int, name: String, time: Long): Boolean = {
+		log.info("Updating info for player: " + name)
+		grabPage(playerUrl.format(server, name)) match {
+			case Some(page) => {
+				try {
+					// remove invalid xml unicode characters from guild: Otto,4556801,1
+					val xml = XML.loadString(page.replace("\u0010", "").replace("\u0018", ""))
+					val name = (xml \ "name")
+					val basicStats = (xml \ "basic_stats")
+					val orgMembership = (xml \ "organization_membership")
+					val character = new Character((name \ "nickname").text,
+							(name \ "firstname").text,
+							(name \ "lastname").text,
+							if (orgMembership.isEmpty) 0 else (orgMembership \ "rank_id").text.toInt,
+							if (orgMembership.isEmpty) "" else (orgMembership \ "rank_name").text,
+							(basicStats \ "level").text.toInt,
+							(basicStats \ "faction").text,
+							(basicStats \ "profession").text,
+							(basicStats \ "profession_title").text,
+							(basicStats \ "gender").text,
+							(basicStats \ "breed").text,
+							(basicStats \ "defender_rank_id").text.toInt,
+							(basicStats \ "defender_rank").text,
+							if (orgMembership.isEmpty) 0 else (orgMembership \ "organization_id").text.toInt,
+							server,
+							0,
+							0)
+
+					CharacterDao.save(connection, character, time)
+					true
+				} catch {
+					case e: SAXParseException => log.error("Could not parse player info: " + name, e)
+					false
+				}
+			}
+			case None => {
+				log.error("Could not retrieve xml file for player: " + name)
+				false
+			}
+		}
 	}
 	
 	def updateRemovedGuildMembers(orgInfo: OrgInfo, time: Long) {
@@ -132,7 +199,7 @@ object Program extends App {
 	def retrieveOrgRoster(orgInfo: OrgInfo): Option[List[Character]] = {
 		val orgRosterUrl = "http://people.anarchy-online.com/org/stats/d/%d/name/%d/basicstats.xml"
 		grabPage(orgRosterUrl.format(orgInfo.server, orgInfo.guildId)) match {
-			case Some(page: String) => {
+			case Some(page) => {
 				try {
 					// remove invalid xml unicode characters from guild: Otto,4556801,1
 					val xml = XML.loadString(page.replace("\u0010", "").replace("\u0018", ""))
@@ -161,7 +228,7 @@ object Program extends App {
 	
 	def pullOrgInfoFromPage(page: String) = {
 		log.debug("Processing page...")
-		val pattern = """(?s)<a href="http://people.anarchy-online.com/org/stats/d/(\d)/name/(\d+)">(.+?)</a>""".r
+		val pattern = """(?s)<a href="http://people.anarchy-online.com/org/stats/d/(\d+)/name/(\d+)">(.+?)</a>""".r
 		val orgInfoList = List[OrgInfo]()
 		
 		pullOrgInfo(pattern.findAllIn(page).matchData)
