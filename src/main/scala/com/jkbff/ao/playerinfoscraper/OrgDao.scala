@@ -54,9 +54,4 @@ object OrgDao {
 
 		db.update(sql, List(orgInfo.guildId, orgInfo.guildName, orgInfo.faction, orgInfo.server, time, time))
 	}
-	
-	def createTable(db: DB) {
-		val sql = Source.fromURL(getClass().getClassLoader().getResource("guild.sql")).mkString
-		db.update(sql)
-	}
 }

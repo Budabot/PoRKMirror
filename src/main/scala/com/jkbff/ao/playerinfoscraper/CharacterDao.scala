@@ -101,9 +101,4 @@ object CharacterDao {
 				character.guildRankName, character.level, character.faction, character.profession, character.professionTitle, character.gender,
 				character.breed, character.defenderRank, character.defenderRankName, character.guildId, character.server, time, time))
 	}
-	
-	def createTable(db: DB) {
-		val sql = Source.fromURL(getClass().getClassLoader().getResource("player.sql")).mkString
-		db.update(sql)
-	}
 }
