@@ -1,3 +1,5 @@
 CREATE TABLE batch_history (
-	dt BIGINT NOT NULL
+	dt BIGINT NOT NULL,
+	elapsed SMALLINT NOT NULL,
+	success SMALLINT NOT NULL
 );

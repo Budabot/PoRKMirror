@@ -93,7 +93,7 @@ object Program extends App {
 		}
 
 		using(new DB(ds)) { db =>
-			db.update("INSERT INTO batch_history (dt) VALUES (?)", List(startTime))
+			db.update("INSERT INTO batch_history (dt, elapsed, success) VALUES (?, ?, ?)", List(startTime, 0))
 		}
 
 		val numGuildsSuccess = new AtomicInteger(0)
@@ -117,7 +117,13 @@ object Program extends App {
 
 		numCharacters.addAndGet(updateUnguildedPlayers(5, startTime));
 
-		val elapsedTime = "Elapsed time: " + ((System.currentTimeMillis - startTime.toDouble) / 1000) + "s"
+		val elapsed = ((System.currentTimeMillis - startTime.toDouble) / 1000)
+
+		using(new DB(ds)) { db =>
+			db.update("UPDATE batch_history SET elapsed = ?, success = ? WHERE dt = ?)", List(elapsed, 1, startTime))
+		}
+
+		val elapsedTime = "Elapsed time: " + elapsed + "s"
 		val numCharactersParsed = "Characters parsed: " + numCharacters
 		log.info("Success: " + numGuildsSuccess.get)
 		log.info("Failure: " + numGuildsFailure.get)
