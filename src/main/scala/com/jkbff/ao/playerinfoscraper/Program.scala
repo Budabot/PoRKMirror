@@ -17,6 +17,9 @@ import scala.collection.parallel.ForkJoinTaskSupport
 import java.util.Properties
 import java.io.FileInputStream
 import java.sql.Connection
+import com.jkbff.common.Helper
+import org.apache.commons.dbcp.BasicDataSource
+import com.jkbff.common.DB
 
 object Program extends App {
 	
@@ -29,26 +32,35 @@ object Program extends App {
 	
 	var longestLength = 0
 	
+	lazy val ds = {
+		val ds = new BasicDataSource()
+		ds.setDriverClassName(properties.getProperty("driver"))
+		ds.setUrl(properties.getProperty("connectionString"))
+		ds.setUsername(properties.getProperty("username"))
+		ds.setPassword(properties.getProperty("password"))
+		ds
+	}
+	
 	// initialize the log4j component
 	PropertyConfigurator.configure("log4j.xml")
+
+	val startTime = System.currentTimeMillis
 	
 	try {
-		Program.run
+		Program.run(startTime)
 	} catch {
-		case e: Throwable => log.error("Could not finish retrieving info", e)
+		case e: Throwable => log.error("Could not finish retrieving info for batch " + startTime, e)
 		e.printStackTrace()
 	}
 	
-	def run = {
-		val startTime = System.currentTimeMillis
-		
+	def run(startTime: Long) = {
 		val orgNameUrl = "http://people.anarchy-online.com/people/lookup/orgs.html?l=%s"
 		
-		//val letters = List("a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "others")
+		val letters = List("a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "others")
 		//val letters = List("o", "o")
-		val letters = List("q")
+		//val letters = List("q")
 
-		//val orgInfoList = List(new OrgInfo(5593094, "Devil Inside", 2))
+		//val orgInfoList = List(new OrgInfo(5138, "Friends With Benefits", 5))
 		val orgInfoList = letters.foldLeft (List[OrgInfo]()) { (list, letter) =>
 			updateDisplay("Grabbing orgs that start with: '" + letter + "'")
 			grabPage(orgNameUrl.format(letter)) match {
@@ -63,9 +75,9 @@ object Program extends App {
 		}
 		
 		if (properties.getProperty("create_tables") == "true") {
-			Helper.using(Database.getConnection()) { connection =>
-				OrgDao.createTable(connection)
-				CharacterDao.createTable(connection)
+			Helper.using(new DB(ds)) { db =>
+				OrgDao.createTable(db)
+				CharacterDao.createTable(db)
 			}
 		}
 		
@@ -73,7 +85,7 @@ object Program extends App {
 		val numGuildsFailure = new AtomicInteger(0)
 		val numCharacters = new AtomicInteger(0)
 		val parOrgInfoList = orgInfoList.par
-		parOrgInfoList.tasksupport = new ForkJoinTaskSupport(new scala.concurrent.forkjoin.ForkJoinPool(8))
+		parOrgInfoList.tasksupport = new ForkJoinTaskSupport(new scala.concurrent.forkjoin.ForkJoinPool(properties.getProperty("threads").toInt))
 		parOrgInfoList.foreach{ orgInfo =>
 			retrieveOrgRoster(orgInfo) match {
 				case Some(orgRoster) => {
@@ -87,10 +99,6 @@ object Program extends App {
 			}
 			updateGuildDisplay(numGuildsSuccess.get, numGuildsFailure.get, orgInfoList.size)
 		}
-		
-		/*orgInfoList.foreach{ orgInfo =>
-			updateRemovedGuildMembers(orgInfo, startTime)
-		}*/
 		
 		numCharacters.addAndGet(updateUnguildedPlayers(5, startTime));
 		
@@ -108,11 +116,11 @@ object Program extends App {
 	
 	def updateUnguildedPlayers(server: Int, time: Long): Int = {
 		val numUpdated = new AtomicInteger(0)
-		Helper.using(Database.getConnection()) { connection =>
-			val list = CharacterDao.findUnupdatedMembers(connection, server, time)
+		Helper.using(new DB(ds)) { db =>
+			val list = CharacterDao.findUnupdatedMembers(db, server, time)
 			//list.tasksupport = new ForkJoinTaskSupport(new scala.concurrent.forkjoin.ForkJoinPool(8))
 			list.foreach { x =>
-				if (updateSinglePlayer(connection, server, x.nickname, time)) {
+				if (updateSinglePlayer(db, server, x.nickname, time)) {
 					numUpdated.addAndGet(1)
 				}
 			}
@@ -120,7 +128,7 @@ object Program extends App {
 		numUpdated.intValue()
 	}
 	
-	def updateSinglePlayer(connection: Connection, server: Int, name: String, time: Long): Boolean = {
+	def updateSinglePlayer(db: DB, server: Int, name: String, time: Long): Boolean = {
 		log.info("Updating info for player: " + name)
 		grabPage(playerUrl.format(server, name)) match {
 			case Some(page) => {
@@ -148,7 +156,7 @@ object Program extends App {
 							0,
 							0)
 
-					CharacterDao.save(connection, character, time)
+					CharacterDao.save(db, character, time)
 					true
 				} catch {
 					case e: SAXParseException => log.error("Could not parse player info: " + name, e)
@@ -162,37 +170,32 @@ object Program extends App {
 		}
 	}
 	
-	def updateRemovedGuildMembers(orgInfo: OrgInfo, time: Long) {
+	def updateRemovedGuildMembers(db: DB, orgInfo: OrgInfo, time: Long) {
 		// skip failed orgs
 		if (orgInfo.faction == null) {
 			return
 		}
 		
 		log.debug("Removing guild members for guild: " + orgInfo)
-		Helper.using(Database.getConnection()) { connection =>
-			connection.setAutoCommit(false)
-			val characters = CharacterDao.findUnupdatedGuildMembers(connection, orgInfo, time)
-			characters.foreach { x =>
-				val character = new Character(x.nickname, x.firstName, x.lastName, x.guildRank, x.guildRankName, x.level,
-						orgInfo.faction, x.profession, x.professionTitle, x.gender, x.breed, x.defenderRank, x.defenderRankName,
-						0, x.server, 0, 0)
-				CharacterDao.addHistory(connection, character, time)
-			}
-			connection.commit()
-			connection.setAutoCommit(true)
+		val characters = CharacterDao.findUnupdatedGuildMembers(db, orgInfo, time)
+		characters.foreach { x =>
+			val character = new Character(x.nickname, x.firstName, x.lastName, x.guildRank, x.guildRankName, x.level,
+					orgInfo.faction, x.profession, x.professionTitle, x.gender, x.breed, x.defenderRank, x.defenderRankName,
+					0, x.server, 0, 0)
+			CharacterDao.addHistory(db, character, time)
 		}
 	}
 	
 	def save(orgInfo: OrgInfo, characters: List[Character], time: Long) = {
 		log.debug("Saving guild members for guild: " + orgInfo)
-		Helper.using(Database.getConnection()) { connection =>
-			connection.setAutoCommit(false)
-			OrgDao.save(connection, orgInfo, time)
-			characters.foreach{ x =>
-				CharacterDao.save(connection, x, time)
+		Helper.using(new DB(ds)) { db =>
+			db.transaction {
+				OrgDao.save(db, orgInfo, time)
+				characters.foreach{ x =>
+					CharacterDao.save(db, x, time)
+				}
+				updateRemovedGuildMembers(db, orgInfo, time)
 			}
-			connection.commit()
-			connection.setAutoCommit(true)
 		}
 	}
 	

@@ -3,9 +3,11 @@ import java.sql.Connection
 import java.sql.ResultSet
 import scala.annotation.tailrec
 import scala.io.Source
+import com.jkbff.common.Helper
+import com.jkbff.common.DB
 
 object CharacterDao {
-	def save(connection: Connection, character: Character, time: Long) {
+	def save(db: DB, character: Character, time: Long) {
 		val sql = "SELECT 1 FROM player p1 WHERE " +
 				"p1.nickname = ? AND " +
 				"p1.server = ? AND " +
@@ -23,75 +25,49 @@ object CharacterDao {
 				"p1.defender_rank_name = ? AND " +
 				"p1.guild_id = ?"
 		
-		val statement = Database.prepareStatement(connection, sql, character.nickname, character.server,
-				character.firstName, character.lastName, character.guildRank, character.guildRankName, character.level,
-				character.faction, character.profession, character.professionTitle, character.gender, character.breed,
-				character.defenderRank, character.defenderRankName, character.guildId)
+		val result = db.querySingle(sql,
+					List(character.nickname, character.server,
+							character.firstName, character.lastName, character.guildRank, character.guildRankName, character.level,
+							character.faction, character.profession, character.professionTitle, character.gender, character.breed,
+							character.defenderRank, character.defenderRankName, character.guildId),
+					_.getInt(1))
 		
-		val resultSet = statement.executeQuery()
-		if (!resultSet.next()) {
-			updateInfo(connection, character, time)
-			addHistory(connection, character, time)
+		if (result.isEmpty) {
+			updateInfo(db, character, time)
+			addHistory(db, character, time)
 		} else {
-			updateLastChecked(connection, character, time)
+			updateLastChecked(db, character, time)
 		}
-		resultSet.close()
-		statement.close()
 	}
 	
-	def findUnupdatedGuildMembers(connection: Connection, orgInfo: OrgInfo, time: Long): List[Character] = {
+	def findUnupdatedGuildMembers(db: DB, orgInfo: OrgInfo, time: Long): List[Character] = {
 		val sql = 
 			"SELECT * FROM player p " +
 			"WHERE p.server = ? AND p.guild_id = ? AND p.last_checked <> ?"
 		
-		val statement = Database.prepareStatement(connection, sql, orgInfo.server, orgInfo.guildId, time)
-
-		val resultSet = statement.executeQuery()
-		val characters = retrieveResultSet(resultSet)
-
-		statement.close()
-		
-		characters
+		db.query(sql,
+				List(orgInfo.server, orgInfo.guildId, time),
+				{ rs => new Character(rs) })
 	}
 	
-	def findUnupdatedMembers(connection: Connection, server: Int, time: Long): List[Character] = {
+	def findUnupdatedMembers(db: DB, server: Int, time: Long): List[Character] = {
 		val sql = 
 			"SELECT * FROM player p " +
 			"WHERE p.server = ? AND p.last_checked <> ?"
 		
-		val statement = Database.prepareStatement(connection, sql, server, time)
-
-		val resultSet = statement.executeQuery()
-		val characters = retrieveResultSet(resultSet)
-
-		statement.close()
-		
-		characters
+		db.query(sql,
+				List(server, time),
+				{ rs => new Character(rs) })
 	}
 	
-	@tailrec
-	private def retrieveResultSet(rs: ResultSet, list: List[Character] = Nil): List[Character] = {
-		if (!rs.next()) {
-			return list
-		}
-
-		return retrieveResultSet(rs, new Character(rs) :: list)
-	}
-	
-	private def updateLastChecked(connection: Connection, character: Character, time: Long): Int = {
+	private def updateLastChecked(db: DB, character: Character, time: Long): Int = {
 		val sql = "UPDATE player SET last_checked = ? " +
 				"WHERE nickname = ? AND server = ?"
 		
-		val statement = Database.prepareStatement(connection, sql, time, character.nickname, character.server)
-
-		val numRows = statement.executeUpdate()
-
-		statement.close()
-		
-		numRows
+		db.update(sql, List(time, character.nickname, character.server))
 	}
 	
-	def addHistory(connection: Connection, character: Character, time: Long) {
+	def addHistory(db: DB, character: Character, time: Long) {
 		val sql =
 			"INSERT INTO player_history (" +
 				"nickname, first_name, last_name, guild_rank, guild_rank_name, " +
@@ -102,19 +78,14 @@ object CharacterDao {
 				"?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?" +
 			")"
 		
-		val statement = Database.prepareStatement(connection, sql, character.nickname, character.firstName, character.lastName, character.guildRank,
+		db.update(sql, List(character.nickname, character.firstName, character.lastName, character.guildRank,
 				character.guildRankName, character.level, character.faction, character.profession, character.professionTitle, character.gender,
-				character.breed, character.defenderRank, character.defenderRankName, character.guildId, character.server, time, time)
-		
-		statement.executeUpdate()
-		statement.close()
+				character.breed, character.defenderRank, character.defenderRankName, character.guildId, character.server, time, time))
 	}
 	
-	def updateInfo(connection: Connection, character: Character, time: Long) {
+	def updateInfo(db: DB, character: Character, time: Long) {
 		val deleteSql = "DELETE FROM player WHERE nickname = ? AND server = ?"
-		Helper.using(Database.prepareStatement(connection, deleteSql, character.nickname, character.server)) { stmt =>
-			stmt.execute
-		}
+		db.update(deleteSql, List(character.nickname, character.server))
 		
 		val sql =
 			"INSERT INTO player (" +
@@ -126,20 +97,13 @@ object CharacterDao {
 				"?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?" +
 			")"
 		
-		val statement = Database.prepareStatement(connection, sql, character.nickname, character.firstName, character.lastName, character.guildRank,
+		db.update(sql, List(character.nickname, character.firstName, character.lastName, character.guildRank,
 				character.guildRankName, character.level, character.faction, character.profession, character.professionTitle, character.gender,
-				character.breed, character.defenderRank, character.defenderRankName, character.guildId, character.server, time, time)
-			
-		Helper.using(statement) { stmt =>
-			stmt.executeUpdate()
-		}
+				character.breed, character.defenderRank, character.defenderRankName, character.guildId, character.server, time, time))
 	}
 	
-	def createTable(connection: Connection) {
+	def createTable(db: DB) {
 		val sql = Source.fromURL(getClass().getClassLoader().getResource("player.sql")).mkString
-		val statement = Database.prepareStatement(connection, sql)
-		
-		statement.executeUpdate()
-		statement.close()
+		db.update(sql)
 	}
 }

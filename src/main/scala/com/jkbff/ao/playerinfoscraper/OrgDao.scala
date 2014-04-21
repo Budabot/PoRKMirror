@@ -1,9 +1,11 @@
 package com.jkbff.ao.playerinfoscraper
 import java.sql.Connection
 import scala.io.Source
+import com.jkbff.common.Helper
+import com.jkbff.common.DB
 
 object OrgDao {
-	def save(connection: Connection, orgInfo: OrgInfo, time: Long) {
+	def save(db: DB, orgInfo: OrgInfo, time: Long) {
 		val sql = "SELECT 1 FROM guild g1 WHERE " +
 				"g1.guild_Id = ? AND " +
 				"g1.server = ? AND " +
@@ -11,33 +13,24 @@ object OrgDao {
 				"g1.guild_name = ? AND " +
 				"g1.faction = ? ";
 		
-		val statement = Database.prepareStatement(connection, sql, orgInfo.guildId, orgInfo.server, orgInfo.guildId, orgInfo.server,
-				orgInfo.guildName, orgInfo.faction)
+		val result = db.querySingle(sql,
+				List(orgInfo.guildId, orgInfo.server, orgInfo.guildId, orgInfo.server, orgInfo.guildName, orgInfo.faction),
+				_.getInt(1))
 		
-		val resultSet = statement.executeQuery()
-		if (!resultSet.next()) {
-			updateInfo(connection, orgInfo, time)
-			addHistory(connection, orgInfo, time)
+		if (result.isEmpty) {
+			updateInfo(db, orgInfo, time)
+			addHistory(db, orgInfo, time)
 		} else {
-			updateLastChecked(connection, orgInfo, time)
+			updateLastChecked(db, orgInfo, time)
 		}
-		resultSet.close()
-		statement.close()
 	}
 	
-	private def updateLastChecked(connection: Connection, orgInfo: OrgInfo, time: Long): Int = {
+	private def updateLastChecked(db: DB, orgInfo: OrgInfo, time: Long): Int = {
 		val sql = "UPDATE guild SET last_checked = ? WHERE guild_id = ? AND server = ?";
-		
-		val statement = Database.prepareStatement(connection, sql, time, orgInfo.guildId, orgInfo.server)
-
-		val numRows = statement.executeUpdate()
-
-		statement.close()
-		
-		numRows
+		db.update(sql, List(time, orgInfo.guildId, orgInfo.server))
 	}
 	
-	private def addHistory(connection: Connection, orgInfo: OrgInfo, time: Long) {
+	private def addHistory(db: DB, orgInfo: OrgInfo, time: Long) {
 		val sql =
 			"INSERT INTO guild_history (" +
 				"guild_id, guild_name, faction, server, last_checked, last_changed" +
@@ -45,17 +38,12 @@ object OrgDao {
 				"?,?,?,?,?,?" +
 			")";
 
-		val statement = Database.prepareStatement(connection, sql, orgInfo.guildId, orgInfo.guildName, orgInfo.faction, orgInfo.server, time, time)
-		
-		statement.executeUpdate()
-		statement.close()
+		db.update(sql, List(orgInfo.guildId, orgInfo.guildName, orgInfo.faction, orgInfo.server, time, time))
 	}
 	
-	private def updateInfo(connection: Connection, orgInfo: OrgInfo, time: Long) {
+	private def updateInfo(db: DB, orgInfo: OrgInfo, time: Long) {
 		val deleteSql = "DELETE FROM guild WHERE guild_id = ? AND server = ?"
-		Helper.using(Database.prepareStatement(connection, deleteSql, orgInfo.guildId, orgInfo.server)) { stmt =>
-			stmt.execute
-		}
+		db.update(deleteSql, List(orgInfo.guildId, orgInfo.server))
 		
 		val sql =
 			"INSERT INTO guild (" +
@@ -64,18 +52,11 @@ object OrgDao {
 				"?,?,?,?,?,?" +
 			")";
 
-		val statement = Database.prepareStatement(connection, sql, orgInfo.guildId, orgInfo.guildName, orgInfo.faction, orgInfo.server, time, time)
-		
-		Helper.using(statement) { stmt =>
-			stmt.executeUpdate()
-		}
+		db.update(sql, List(orgInfo.guildId, orgInfo.guildName, orgInfo.faction, orgInfo.server, time, time))
 	}
 	
-	def createTable(connection: Connection) {
+	def createTable(db: DB) {
 		val sql = Source.fromURL(getClass().getClassLoader().getResource("guild.sql")).mkString
-		val statement = Database.prepareStatement(connection, sql)
-		
-		statement.executeUpdate()
-		statement.close()
+		db.update(sql)
 	}
 }
