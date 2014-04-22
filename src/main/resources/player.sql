@@ -14,6 +14,7 @@ CREATE TABLE player (
 	defender_rank_name VARCHAR(50) NOT NULL,
 	guild_id INT NOT NULL,
 	server INT NOT NULL,
+	deleted SMALLINT NOT NULL,
 	last_checked BIGINT NOT NULL,
 	last_changed BIGINT NOT NULL,
 	PRIMARY KEY(nickname, server)
@@ -38,6 +39,7 @@ CREATE TABLE player_history (
 	defender_rank_name VARCHAR(50) NOT NULL,
 	guild_id INT NOT NULL,
 	server INT NOT NULL,
+	deleted SMALLINT NOT NULL,
 	last_checked BIGINT NOT NULL,
 	last_changed BIGINT NOT NULL
 );
