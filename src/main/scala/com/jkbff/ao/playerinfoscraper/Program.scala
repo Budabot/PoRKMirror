@@ -40,9 +40,6 @@ object Program extends App {
 		ds.setPassword(properties.getProperty("password"))
 		ds
 	}
-	
-	// initialize the log4j component
-	PropertyConfigurator.configure("log4j.xml")
 
 	val startTime = System.currentTimeMillis
 	
@@ -54,6 +51,8 @@ object Program extends App {
 	}
 	
 	def run(startTime: Long) = {
+		log.info("Starting batch " + startTime)
+		
 		val orgNameUrl = "http://people.anarchy-online.com/people/lookup/orgs.html?l=%s"
 		
 		val letters = List("a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "others")

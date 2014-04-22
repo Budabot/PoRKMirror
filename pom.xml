@@ -7,6 +7,7 @@
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<releaseDir>${project.build.directory}/release/${project.name}-${project.version}</releaseDir>
 	</properties>
 	
 	<repositories>
@@ -84,7 +85,7 @@
 							<goal>copy-resources</goal>
 						</goals>
 						<configuration>
-							<outputDirectory>${project.build.directory}/release</outputDirectory>
+							<outputDirectory>${releaseDir}</outputDirectory>
 							<resources>
 								<resource>
 									<directory>src/main/resources</directory>
@@ -107,7 +108,7 @@
 						</goals>
 						<configuration>
 							<outputDirectory>
-								${project.build.directory}/release/lib
+								${releaseDir}/lib
 							</outputDirectory>
 						</configuration>
 					</execution>
@@ -180,7 +181,7 @@
 						</goals>
 						<configuration>
 							<outputDirectory>
-								${project.build.directory}/release/lib
+								${releaseDir}/lib
 							</outputDirectory>
 						</configuration>
 					</execution>
