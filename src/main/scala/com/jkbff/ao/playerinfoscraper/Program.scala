@@ -20,6 +20,7 @@ import java.sql.Connection
 import com.jkbff.common.Helper._
 import org.apache.commons.dbcp.BasicDataSource
 import com.jkbff.common.DB
+import java.io.FileNotFoundException
 
 object Program extends App {
 
@@ -152,7 +153,10 @@ object Program extends App {
 	def updateSinglePlayer(db: DB, server: Int, name: String, time: Long): Boolean = {
 		log.info("Updating info for player: " + name)
 		grabPage(playerUrl.format(server, name)) match {
-			case Some(page) => {
+			case Some(p) if p == "filenotfound" =>
+				CharacterDao.save(db, new Character(name, true, server), time)
+				true
+			case Some(page) =>
 				try {
 					// remove invalid xml unicode characters from guild: Otto,4556801,1
 					val xml = XML.loadString(page.replace("\u0010", "").replace("\u0018", ""))
@@ -174,6 +178,7 @@ object Program extends App {
 						(basicStats \ "defender_rank").text,
 						if (orgMembership.isEmpty) 0 else (orgMembership \ "organization_id").text.toInt,
 						server,
+						false,
 						0,
 						0)
 
@@ -184,7 +189,6 @@ object Program extends App {
 						log.error("Could not parse player info: " + name, e)
 						false
 				}
-			}
 			case None => {
 				log.error("Could not retrieve xml file for player: " + name)
 				false
@@ -203,7 +207,7 @@ object Program extends App {
 		characters.foreach { x =>
 			val character = new Character(x.nickname, x.firstName, x.lastName, x.guildRank, x.guildRankName, x.level,
 				orgInfo.faction, x.profession, x.professionTitle, x.gender, x.breed, x.defenderRank, x.defenderRankName,
-				0, x.server, 0, 0)
+				0, x.server, false, 0, 0)
 			CharacterDao.addHistory(db, character, time)
 		}
 	}
@@ -275,6 +279,9 @@ object Program extends App {
 			try {
 				return Some(Source.fromURL(url)("iso-8859-15").mkString)
 			} catch {
+				case e: FileNotFoundException =>
+					// valid response, invalid request (ie. character or guild no longer exists)
+					return Some("filenotfound")
 				case e: IOException => {
 					log.warn("Failed on attempt " + x + " to fetch page: " + url, e)
 					Thread.sleep(5000)
