@@ -35,7 +35,6 @@ object CharacterDao {
 
 		if (result.isEmpty) {
 			updateInfo(db, character, time)
-			addHistory(db, character, time)
 		} else {
 			updateLastChecked(db, character, time)
 		}
@@ -68,23 +67,6 @@ object CharacterDao {
 		db.update(sql, List(time, character.nickname, character.server))
 	}
 
-	def addHistory(db: DB, character: Character, time: Long) {
-		val sql =
-			"INSERT INTO player_history (" +
-				"nickname, first_name, last_name, guild_rank, guild_rank_name, " +
-				"level, faction, profession, profession_title, gender, breed, " +
-				"defender_rank, defender_rank_name, guild_id, server, " +
-				"deleted, last_checked, last_changed " +
-				") VALUES (" +
-				"?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?" +
-				")"
-
-		db.update(sql, List(character.nickname, character.firstName, character.lastName, character.guildRank,
-			character.guildRankName, character.level, character.faction, character.profession, character.professionTitle, character.gender,
-			character.breed, character.defenderRank, character.defenderRankName, character.guildId, character.server,
-			if (character.deleted) 1 else 0, time, time))
-	}
-
 	def updateInfo(db: DB, character: Character, time: Long) {
 		val deleteSql = "DELETE FROM player WHERE nickname = ? AND server = ?"
 		db.update(deleteSql, List(character.nickname, character.server))
@@ -103,5 +85,9 @@ object CharacterDao {
 			character.guildRankName, character.level, character.faction, character.profession, character.professionTitle, character.gender,
 			character.breed, character.defenderRank, character.defenderRankName, character.guildId, character.server,
 			if (character.deleted) 1 else 0, time, time))
+
+		// add history
+		val historySql = "INSERT INTO player_history SELECT * FROM player WHERE nickname = ? AND server = ?"
+		db.update(historySql, List(character.nickname, character.server))
 	}
 }

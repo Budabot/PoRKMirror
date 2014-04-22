@@ -65,35 +65,23 @@ object Program extends App {
 		val orgInfoList = letters.foldLeft(List[OrgInfo]()) { (list, letter) =>
 			updateDisplay("Grabbing orgs that start with: '" + letter + "'")
 			grabPage(orgNameUrl.format(letter)) match {
-				case Some(page) => {
+				case Some(p) if p == "filenotfound" =>
+					log.error("FileNotFound for letter: " + letter)
+					list
+				case Some(page) =>
 					pullOrgInfoFromPage(page) ::: list
-				}
-				case None => {
+				case None =>
 					log.error("Could not load info for letter: " + letter)
 					list
-				}
 			}
 		}
 
 		if (properties.getProperty("create_tables") == "true") {
-			using(new DB(ds)) { db =>
-				using(Source.fromURL(getClass().getClassLoader().getResource("batch_history.sql"))) { source =>
-					db.update(source.mkString)
-				}
-				using(Source.fromURL(getClass().getClassLoader().getResource("guild.sql"))) { source =>
-					db.update(source.mkString)
-				}
-				using(Source.fromURL(getClass().getClassLoader().getResource("player.sql"))) { source =>
-					db.update(source.mkString)
-				}
-				using(Source.fromURL(getClass().getClassLoader().getResource("history_requests.sql"))) { source =>
-					db.update(source.mkString)
-				}
-			}
+			createTables()
 		}
 
 		using(new DB(ds)) { db =>
-			db.update("INSERT INTO batch_history (dt, elapsed, success) VALUES (?, ?, ?)", List(startTime, 0))
+			db.update("INSERT INTO batch_history (dt, elapsed, success) VALUES (?, ?, ?)", List(startTime, 0, 0))
 		}
 
 		val numGuildsSuccess = new AtomicInteger(0)
@@ -115,15 +103,15 @@ object Program extends App {
 			updateGuildDisplay(numGuildsSuccess.get, numGuildsFailure.get, orgInfoList.size)
 		}
 
-		numCharacters.addAndGet(updateUnguildedPlayers(5, startTime));
+		numCharacters.addAndGet(updateRemainingCharacters(5, startTime));
 
-		val elapsed = ((System.currentTimeMillis - startTime.toDouble) / 1000)
+		val elapsed = System.currentTimeMillis - startTime
 
 		using(new DB(ds)) { db =>
-			db.update("UPDATE batch_history SET elapsed = ?, success = ? WHERE dt = ?)", List(elapsed, 1, startTime))
+			db.update("UPDATE batch_history SET elapsed = ?, success = ? WHERE dt = ?", List(elapsed, 1, startTime))
 		}
 
-		val elapsedTime = "Elapsed time: " + elapsed + "s"
+		val elapsedTime = "Elapsed time: " + (elapsed.toDouble / 1000) + "s"
 		val numCharactersParsed = "Characters parsed: " + numCharacters
 		log.info("Success: " + numGuildsSuccess.get)
 		log.info("Failure: " + numGuildsFailure.get)
@@ -134,8 +122,26 @@ object Program extends App {
 		println(elapsedTime)
 		println(numCharactersParsed)
 	}
+	
+	def createTables(): Unit = {
+		using(new DB(ds)) { db =>
+			using(Source.fromURL(getClass().getClassLoader().getResource("batch_history.sql"))) { source =>
+				db.update(source.mkString)
+			}
+			using(Source.fromURL(getClass().getClassLoader().getResource("guild.sql"))) { source =>
+				db.update(source.mkString)
+			}
+			using(Source.fromURL(getClass().getClassLoader().getResource("player.sql"))) { source =>
+				db.update(source.mkString)
+			}
+			using(Source.fromURL(getClass().getClassLoader().getResource("history_requests.sql"))) { source =>
+				db.update(source.mkString)
+			}
+		}
+	}
 
-	def updateUnguildedPlayers(server: Int, time: Long): Int = {
+	// manually update all remaining characters that haven't already been updated
+	def updateRemainingCharacters(server: Int, time: Long): Int = {
 		val numUpdated = new AtomicInteger(0)
 		using(new DB(ds)) { db =>
 			val list = CharacterDao.findUnupdatedMembers(db, server, time)
@@ -188,26 +194,9 @@ object Program extends App {
 						log.error("Could not parse player info: " + name, e)
 						false
 				}
-			case None => {
+			case None =>
 				log.error("Could not retrieve xml file for player: " + name)
 				false
-			}
-		}
-	}
-
-	def updateRemovedGuildMembers(db: DB, orgInfo: OrgInfo, time: Long) {
-		// skip failed orgs
-		if (orgInfo.faction == null) {
-			return
-		}
-
-		log.debug("Removing guild members for guild: " + orgInfo)
-		val characters = CharacterDao.findUnupdatedGuildMembers(db, orgInfo, time)
-		characters.foreach { x =>
-			val character = new Character(x.nickname, x.firstName, x.lastName, x.guildRank, x.guildRankName, x.level,
-				orgInfo.faction, x.profession, x.professionTitle, x.gender, x.breed, x.defenderRank, x.defenderRankName,
-				0, x.server, false, 0, 0)
-			CharacterDao.addHistory(db, character, time)
 		}
 	}
 
@@ -219,7 +208,6 @@ object Program extends App {
 				characters.foreach { x =>
 					CharacterDao.save(db, x, time)
 				}
-				updateRemovedGuildMembers(db, orgInfo, time)
 			}
 		}
 	}
@@ -227,7 +215,10 @@ object Program extends App {
 	def retrieveOrgRoster(orgInfo: OrgInfo): Option[List[Character]] = {
 		val orgRosterUrl = "http://people.anarchy-online.com/org/stats/d/%d/name/%d/basicstats.xml"
 		grabPage(orgRosterUrl.format(orgInfo.server, orgInfo.guildId)) match {
-			case Some(page) => {
+			case Some(p) if p == "filenotfound" =>
+				log.error("FileNotFound for xml file for org: " + orgInfo)
+				None
+			case Some(page) =>
 				try {
 					// remove invalid xml unicode characters from guild: Otto,4556801,1
 					val xml = XML.loadString(page.replace("\u0010", "").replace("\u0018", ""))
@@ -235,14 +226,15 @@ object Program extends App {
 
 					val characters = pullCharInfo((xml \\ "member").reverseIterator, orgInfo)
 
-					return Some(characters)
+					Some(characters)
 				} catch {
 					case e: SAXParseException => log.error("Could not parse roster for org: " + orgInfo, e)
+					None
 				}
-			}
-			case None => log.error("Could not retrieve xml file for org: " + orgInfo)
+			case None =>
+				log.error("Could not retrieve xml file for org: " + orgInfo)
+				None
 		}
-		return None
 	}
 
 	@tailrec
@@ -276,7 +268,9 @@ object Program extends App {
 		for (x <- 1 to 10) {
 			log.info("Attempt " + x + " at grabbing page: " + url)
 			try {
-				return Some(Source.fromURL(url)("iso-8859-15").mkString)
+				using(Source.fromURL(url)("iso-8859-15")) { source =>
+					return Some(source.mkString)
+				}
 			} catch {
 				case e: FileNotFoundException =>
 					// valid response, invalid request (ie. character or guild no longer exists)
@@ -287,7 +281,7 @@ object Program extends App {
 				}
 			}
 		}
-		return None
+		None
 	}
 
 	def updateGuildDisplay(numGuildsSuccess: Int, numGuildsFailure: Int, numGuildsTotal: Int) {
