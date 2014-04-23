@@ -173,7 +173,7 @@ object Program extends App {
 						(name \ "firstname").text,
 						(name \ "lastname").text,
 						if (orgMembership.isEmpty) 0 else (orgMembership \ "rank_id").text.toInt,
-						if (orgMembership.isEmpty) "" else (orgMembership \ "rank_name").text,
+						if (orgMembership.isEmpty) "" else (orgMembership \ "rank").text,
 						(basicStats \ "level").text.toInt,
 						(basicStats \ "faction").text,
 						(basicStats \ "profession").text,
