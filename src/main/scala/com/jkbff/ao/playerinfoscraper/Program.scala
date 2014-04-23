@@ -24,6 +24,8 @@ import java.io.FileNotFoundException
 
 object Program extends App {
 
+	PropertyConfigurator.configure("./log4j.xml")
+
 	private val log = Logger.getLogger(getClass())
 
 	val properties = new Properties();
@@ -54,27 +56,10 @@ object Program extends App {
 
 	def run(startTime: Long) = {
 		log.info("Starting batch " + startTime)
-		
-		val orgNameUrl = "http://people.anarchy-online.com/people/lookup/orgs.html?l=%s"
 
 		val letters = List("a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "others")
 		//val letters = List("o", "o")
 		//val letters = List("q")
-
-		//val orgInfoList = List(new OrgInfo(5138, "Friends With Benefits", 5))
-		val orgInfoList = letters.foldLeft(List[OrgInfo]()) { (list, letter) =>
-			updateDisplay("Grabbing orgs that start with: '" + letter + "'")
-			grabPage(orgNameUrl.format(letter)) match {
-				case Some(p) if p == "filenotfound" =>
-					log.error("FileNotFound for letter: " + letter)
-					list
-				case Some(page) =>
-					pullOrgInfoFromPage(page) ::: list
-				case None =>
-					log.error("Could not load info for letter: " + letter)
-					list
-			}
-		}
 
 		if (properties.getProperty("create_tables") == "true") {
 			createTables()
@@ -84,6 +69,8 @@ object Program extends App {
 			db.update("INSERT INTO batch_history (dt, elapsed, success) VALUES (?, ?, ?)", List(startTime, 0, 0))
 		}
 
+		val orgInfoList = getOrgInfoList(letters)
+
 		val numGuildsSuccess = new AtomicInteger(0)
 		val numGuildsFailure = new AtomicInteger(0)
 		val numCharacters = new AtomicInteger(0)
@@ -91,14 +78,12 @@ object Program extends App {
 		parOrgInfoList.tasksupport = new ForkJoinTaskSupport(new scala.concurrent.forkjoin.ForkJoinPool(properties.getProperty("threads").toInt))
 		parOrgInfoList.foreach { orgInfo =>
 			retrieveOrgRoster(orgInfo) match {
-				case Some(orgRoster) => {
+				case Some(orgRoster) =>
 					numCharacters.addAndGet(orgRoster.size)
 					save(orgInfo, orgRoster, startTime)
 					numGuildsSuccess.addAndGet(1)
-				}
-				case None => {
+				case None =>
 					numGuildsFailure.addAndGet(1)
-				}
 			}
 			updateGuildDisplay(numGuildsSuccess.get, numGuildsFailure.get, orgInfoList.size)
 		}
@@ -122,21 +107,37 @@ object Program extends App {
 		println(elapsedTime)
 		println(numCharactersParsed)
 	}
-	
+
+	def getOrgInfoList(letters: List[String]): List[OrgInfo] = {
+		val orgNameUrl = "http://people.anarchy-online.com/people/lookup/orgs.html?l=%s"
+
+		letters.foldLeft(List[OrgInfo]()) { (list, letter) =>
+			updateDisplay("Grabbing orgs that start with: '" + letter + "'")
+			grabPage(orgNameUrl.format(letter)) match {
+				case Some(p) if p == "filenotfound" =>
+					log.error("FileNotFound for letter: " + letter)
+					list
+				case Some(page) =>
+					pullOrgInfoFromPage(page) ::: list
+				case None =>
+					log.error("Could not load info for letter: " + letter)
+					list
+			}
+		}
+	}
+
 	def createTables(): Unit = {
 		using(new DB(ds)) { db =>
-			using(Source.fromURL(getClass().getClassLoader().getResource("batch_history.sql"))) { source =>
-				db.update(source.mkString)
-			}
-			using(Source.fromURL(getClass().getClassLoader().getResource("guild.sql"))) { source =>
-				db.update(source.mkString)
-			}
-			using(Source.fromURL(getClass().getClassLoader().getResource("player.sql"))) { source =>
-				db.update(source.mkString)
-			}
-			using(Source.fromURL(getClass().getClassLoader().getResource("history_requests.sql"))) { source =>
-				db.update(source.mkString)
-			}
+			loadSQLResource(db, "batch_history.sql")
+			loadSQLResource(db, "guild.sql")
+			loadSQLResource(db, "player.sql")
+			loadSQLResource(db, "history_requests.sql")
+		}
+	}
+
+	def loadSQLResource(db: DB, filename: String): Unit = {
+		using(Source.fromURL(getClass().getClassLoader().getResource(filename))) { source =>
+			db.update(source.mkString)
 		}
 	}
 
@@ -228,8 +229,9 @@ object Program extends App {
 
 					Some(characters)
 				} catch {
-					case e: SAXParseException => log.error("Could not parse roster for org: " + orgInfo, e)
-					None
+					case e: SAXParseException =>
+						log.error("Could not parse roster for org: " + orgInfo, e)
+						None
 				}
 			case None =>
 				log.error("Could not retrieve xml file for org: " + orgInfo)
