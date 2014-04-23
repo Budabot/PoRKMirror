@@ -40,20 +40,11 @@ object CharacterDao {
 		}
 	}
 
-	def findUnupdatedGuildMembers(db: DB, orgInfo: OrgInfo, time: Long): List[Character] = {
-		val sql =
-			"SELECT * FROM player p " +
-				"WHERE p.server = ? AND p.guild_id = ? AND p.last_checked <> ?"
-
-		db.query(sql,
-			List(orgInfo.server, orgInfo.guildId, time),
-			{ rs => new Character(rs) })
-	}
-
 	def findUnupdatedMembers(db: DB, server: Int, time: Long): List[Character] = {
 		val sql =
 			"SELECT * FROM player p " +
-				"WHERE p.server = ? AND p.last_checked <> ?"
+				"WHERE p.server = ? AND p.last_checked <> ? " +
+				"ORDER BY nickname ASC"
 
 		db.query(sql,
 			List(server, time),

@@ -19,7 +19,6 @@ object OrgDao {
 		
 		if (result.isEmpty) {
 			updateInfo(db, orgInfo, time)
-			addHistory(db, orgInfo, time)
 		} else {
 			updateLastChecked(db, orgInfo, time)
 		}
@@ -28,17 +27,6 @@ object OrgDao {
 	private def updateLastChecked(db: DB, orgInfo: OrgInfo, time: Long): Int = {
 		val sql = "UPDATE guild SET last_checked = ? WHERE guild_id = ? AND server = ?";
 		db.update(sql, List(time, orgInfo.guildId, orgInfo.server))
-	}
-	
-	private def addHistory(db: DB, orgInfo: OrgInfo, time: Long) {
-		val sql =
-			"INSERT INTO guild_history (" +
-				"guild_id, guild_name, faction, server, last_checked, last_changed" +
-			") VALUES (" +
-				"?,?,?,?,?,?" +
-			")";
-
-		db.update(sql, List(orgInfo.guildId, orgInfo.guildName, orgInfo.faction, orgInfo.server, time, time))
 	}
 	
 	private def updateInfo(db: DB, orgInfo: OrgInfo, time: Long) {
@@ -53,5 +41,9 @@ object OrgDao {
 			")";
 
 		db.update(sql, List(orgInfo.guildId, orgInfo.guildName, orgInfo.faction, orgInfo.server, time, time))
+		
+		// add history
+		val historySql = "INSERT INTO guild_history SELECT * FROM guild WHERE guild_id = ? AND server = ?"
+		db.update(historySql, List(orgInfo.guildId, orgInfo.server))
 	}
 }

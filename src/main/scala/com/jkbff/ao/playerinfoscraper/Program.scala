@@ -168,7 +168,7 @@ object Program extends App {
 					val name = (xml \ "name")
 					val basicStats = (xml \ "basic_stats")
 					val orgMembership = (xml \ "organization_membership")
-					val character = new Character((name \ "nickname").text,
+					val character = new Character((name \ "nick").text,
 						(name \ "firstname").text,
 						(name \ "lastname").text,
 						if (orgMembership.isEmpty) 0 else (orgMembership \ "rank_id").text.toInt,
