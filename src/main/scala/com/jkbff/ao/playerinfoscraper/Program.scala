@@ -95,6 +95,8 @@ object Program extends App {
 		using(new DB(ds)) { db =>
 			db.update("UPDATE batch_history SET elapsed = ?, success = ? WHERE dt = ?", List(elapsed, 1, startTime))
 		}
+		
+		println
 
 		val elapsedTime = "Elapsed time: " + (elapsed.toDouble / 1000) + "s"
 		val numCharactersParsed = "Characters parsed: " + numCharacters
@@ -102,10 +104,7 @@ object Program extends App {
 		log.info("Failure: " + numGuildsFailure.get)
 		log.info(elapsedTime)
 		log.info(numCharactersParsed)
-
-		println
-		println(elapsedTime)
-		println(numCharactersParsed)
+		log.info("Finished batch " + startTime)
 	}
 
 	def getOrgInfoList(letters: List[String]): List[OrgInfo] = {
@@ -268,7 +267,7 @@ object Program extends App {
 
 	def grabPage(url: String): Option[String] = {
 		for (x <- 1 to 10) {
-			log.info("Attempt " + x + " at grabbing page: " + url)
+			log.debug("Attempt " + x + " at grabbing page: " + url)
 			try {
 				using(Source.fromURL(url)("iso-8859-15")) { source =>
 					return Some(source.mkString)
@@ -287,7 +286,7 @@ object Program extends App {
 	}
 
 	def updateGuildDisplay(numGuildsSuccess: Int, numGuildsFailure: Int, numGuildsTotal: Int) {
-		updateDisplay("Success: %d  Failed: %d  Total: %d".format(numGuildsSuccess, numGuildsFailure, numGuildsTotal))
+		updateDisplay("Successful: %d  Failed: %d  Total: %d".format(numGuildsSuccess, numGuildsFailure, numGuildsTotal))
 	}
 
 	def updateDisplay(msg: String) {
