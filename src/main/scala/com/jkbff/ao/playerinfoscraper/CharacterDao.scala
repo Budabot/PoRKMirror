@@ -59,23 +59,40 @@ object CharacterDao {
 	}
 
 	def updateInfo(db: DB, character: Character, time: Long) {
-		val deleteSql = "DELETE FROM player WHERE nickname = ? AND server = ?"
-		db.update(deleteSql, List(character.nickname, character.server))
+		if (character.deleted) {
+			val sql = "UPDATE player SET deleted = ?, last_checked = ?, last_changed = ? WHERE nickname = ? AND server = ?"
+			db.update(sql, List(character.deleted, time, time, character.nickname, character.server))
+		} else {
+			val params = List(character.firstName, character.lastName, character.guildRank,
+				character.guildRankName, character.level, character.faction, character.profession, character.professionTitle,
+				character.gender, character.breed, character.defenderRank, character.defenderRankName, character.guildId,
+				if (character.deleted) 1 else 0, time, time, character.nickname, character.server)
+			
+			val updateSql = 
+				"UPDATE player SET " +
+					"first_name = ?, last_name = ?, guild_rank = ?, guild_rank_name = ?, " +
+					"level = ?, faction = ?, profession = ?, profession_title = ?, gender = ?, " +
+					"breed = ?, defender_rank = ?, defender_rank_name = ?, guild_id = ?, " +
+					"deleted = ?, last_checked = ?, last_changed = ? " +
+				"WHERE " +
+					"nickname = ? AND server = ?";
+			
+			val numRows = db.update(updateSql, params)
 
-		val sql =
-			"INSERT INTO player (" +
-				"nickname, first_name, last_name, guild_rank, guild_rank_name, " +
-				"level, faction, profession, profession_title, gender, breed, " +
-				"defender_rank, defender_rank_name, guild_id, server, " +
-				"deleted, last_checked, last_changed " +
-				") VALUES (" +
-				"?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?" +
-				")"
-
-		db.update(sql, List(character.nickname, character.firstName, character.lastName, character.guildRank,
-			character.guildRankName, character.level, character.faction, character.profession, character.professionTitle, character.gender,
-			character.breed, character.defenderRank, character.defenderRankName, character.guildId, character.server,
-			if (character.deleted) 1 else 0, time, time))
+			if (numRows == 0) {
+				val insertSql =
+					"INSERT INTO player (" +
+						"first_name, last_name, guild_rank, guild_rank_name, " +
+						"level, faction, profession, profession_title, gender, breed, " +
+						"defender_rank, defender_rank_name, guild_id, " +
+						"deleted, last_checked, last_changed, nickname, server " +
+					") VALUES (" +
+						"?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?" +
+					")"
+		
+				db.update(insertSql, params)
+			}
+		}
 
 		// add history
 		val historySql = "INSERT INTO player_history SELECT * FROM player WHERE nickname = ? AND server = ?"
