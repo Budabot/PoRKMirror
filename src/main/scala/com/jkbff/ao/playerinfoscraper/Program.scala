@@ -95,7 +95,7 @@ object Program extends App {
 		using(new DB(ds)) { db =>
 			db.update("UPDATE batch_history SET elapsed = ?, success = ? WHERE dt = ?", List(elapsed, 1, startTime))
 		}
-		
+
 		println
 
 		val elapsedTime = "Elapsed time: " + (elapsed.toDouble / 1000) + "s"
@@ -262,7 +262,7 @@ object Program extends App {
 		}
 
 		val m = iter.next
-		return pullOrgInfo(iter, new OrgInfo(m.group(2).toInt, m.group(3).trim, m.group(1).toInt) :: list)
+		return pullOrgInfo(iter, new OrgInfo(m.group(2).toInt, m.group(3).trim, m.group(1).toInt, false) :: list)
 	}
 
 	def grabPage(url: String): Option[String] = {
