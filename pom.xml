@@ -64,11 +64,6 @@
 			<artifactId>scala-library</artifactId>
 			<version>2.10.3</version>
 		</dependency>
-		<dependency>
-			<groupId>com.jkbff.ao</groupId>
-			<artifactId>tyrlib</artifactId>
-			<version>1.0</version>
-		</dependency>
 	</dependencies>
 	
 	<build>

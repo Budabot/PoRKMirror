@@ -32,6 +32,7 @@ object Program extends App {
 	properties.load(new FileInputStream("config.properties"));
 
 	val playerUrl = "http://people.anarchy-online.com/character/bio/d/%d/name/%s/bio.xml"
+	val orgRosterUrl = "http://people.anarchy-online.com/org/stats/d/%d/name/%d/basicstats.xml"
 
 	var longestLength = 0
 
@@ -49,7 +50,7 @@ object Program extends App {
 	try {
 		Program.run(startTime)
 	} catch {
-		case e: Throwable =>
+		case e: Exception =>
 			log.error("Could not finish retrieving info for batch " + startTime, e)
 			e.printStackTrace()
 	}
@@ -77,13 +78,15 @@ object Program extends App {
 		val parOrgInfoList = orgInfoList.par
 		parOrgInfoList.tasksupport = new ForkJoinTaskSupport(new scala.concurrent.forkjoin.ForkJoinPool(properties.getProperty("threads").toInt))
 		parOrgInfoList.foreach { orgInfo =>
-			retrieveOrgRoster(orgInfo) match {
-				case Some(orgRoster) =>
-					numCharacters.addAndGet(orgRoster.size)
-					save(orgInfo, orgRoster, startTime)
-					numGuildsSuccess.addAndGet(1)
-				case None =>
+			try {
+				val orgRoster = retrieveOrgRoster(orgInfo)
+				numCharacters.addAndGet(orgRoster.size)
+				save(orgInfo, orgRoster, startTime)
+				numGuildsSuccess.addAndGet(1)
+			} catch {
+				case e: Exception =>
 					numGuildsFailure.addAndGet(1)
+					log.error("Failed to update org " + orgInfo, e)
 			}
 			updateGuildDisplay(numGuildsSuccess.get, numGuildsFailure.get, orgInfoList.size)
 		}
@@ -112,15 +115,12 @@ object Program extends App {
 
 		letters.foldLeft(List[OrgInfo]()) { (list, letter) =>
 			updateDisplay("Grabbing orgs that start with: '" + letter + "'")
-			grabPage(orgNameUrl.format(letter)) match {
-				case Some(p) if p == "filenotfound" =>
-					log.error("FileNotFound for letter: " + letter)
-					list
-				case Some(page) =>
-					pullOrgInfoFromPage(page) ::: list
-				case None =>
-					log.error("Could not load info for letter: " + letter)
-					list
+			try {
+				val page = grabPage(orgNameUrl.format(letter))
+				pullOrgInfoFromPage(page) ::: list
+			} catch {
+				case e: Exception =>
+					throw new Exception("Could not load info for letter: " + letter, e)
 			}
 		}
 	}
@@ -142,61 +142,66 @@ object Program extends App {
 
 	// manually update all remaining characters that haven't already been updated
 	def updateRemainingCharacters(server: Int, time: Long): Int = {
-		val numUpdated = new AtomicInteger(0)
+		println
+		val numSucess = new AtomicInteger(0)
+		val numFailed = new AtomicInteger
 		using(new DB(ds)) { db =>
-			val list = CharacterDao.findUnupdatedMembers(db, server, time)
-			//list.tasksupport = new ForkJoinTaskSupport(new scala.concurrent.forkjoin.ForkJoinPool(8))
-			list.foreach { x =>
-				if (updateSinglePlayer(db, server, x.nickname, time)) {
-					numUpdated.addAndGet(1)
+			val list = CharacterDao.findUnupdatedMembers(db, server, time).par
+			updateRemaingCharactersDisplay(numSucess.get, numFailed.get, list.size)
+			list.tasksupport = new ForkJoinTaskSupport(new scala.concurrent.forkjoin.ForkJoinPool(properties.getProperty("threads").toInt))
+			list.foreach { character =>
+				try {
+					updateSinglePlayer(db, server, character.nickname, time)
+					numSucess.addAndGet(1)
+				} catch {
+					case e: Exception =>
+						numFailed.addAndGet(1)
+						log.error("Failed to update character " + character, e)
 				}
+				updateRemaingCharactersDisplay(numSucess.get, numFailed.get, list.size)
 			}
 		}
-		numUpdated.intValue()
+		numSucess.intValue()
 	}
 
-	def updateSinglePlayer(db: DB, server: Int, name: String, time: Long): Boolean = {
+	def updateSinglePlayer(db: DB, server: Int, name: String, time: Long): Unit = {
 		log.info("Updating info for player: " + name)
-		grabPage(playerUrl.format(server, name)) match {
-			case Some(p) if p == "filenotfound" =>
-				CharacterDao.save(db, new Character(name, true, server), time)
-				true
-			case Some(page) =>
-				try {
-					// remove invalid xml unicode characters from guild: Otto,4556801,1
-					val xml = XML.loadString(page.replace("\u0010", "").replace("\u0018", ""))
-					val name = (xml \ "name")
-					val basicStats = (xml \ "basic_stats")
-					val orgMembership = (xml \ "organization_membership")
-					val character = new Character((name \ "nick").text,
-						(name \ "firstname").text,
-						(name \ "lastname").text,
-						if (orgMembership.isEmpty) 0 else (orgMembership \ "rank_id").text.toInt,
-						if (orgMembership.isEmpty) "" else (orgMembership \ "rank").text,
-						(basicStats \ "level").text.toInt,
-						(basicStats \ "faction").text,
-						(basicStats \ "profession").text,
-						(basicStats \ "profession_title").text,
-						(basicStats \ "gender").text,
-						(basicStats \ "breed").text,
-						(basicStats \ "defender_rank_id").text.toInt,
-						(basicStats \ "defender_rank").text,
-						if (orgMembership.isEmpty) 0 else (orgMembership \ "organization_id").text.toInt,
-						server,
-						false,
-						0,
-						0)
+		try {
+			val page = grabPage(playerUrl.format(server, name))
+			
+			// remove invalid xml unicode characters from guild: Otto,4556801,1
+			val xml = XML.loadString(page.replace("\u0010", "").replace("\u0018", ""))
+			
+			val nameNode = (xml \ "name")
+			val basicStatsNode = (xml \ "basic_stats")
+			val orgMembershipNode = (xml \ "organization_membership")
+			
+			val character = new Character(
+				(nameNode \ "nick").text,
+				(nameNode \ "firstname").text,
+				(nameNode \ "lastname").text,
+				if (orgMembershipNode.isEmpty) 0 else (orgMembershipNode \ "rank_id").text.toInt,
+				if (orgMembershipNode.isEmpty) "" else (orgMembershipNode \ "rank").text,
+				(basicStatsNode \ "level").text.toInt,
+				(basicStatsNode \ "faction").text,
+				(basicStatsNode \ "profession").text,
+				(basicStatsNode \ "profession_title").text,
+				(basicStatsNode \ "gender").text,
+				(basicStatsNode \ "breed").text,
+				(basicStatsNode \ "defender_rank_id").text.toInt,
+				(basicStatsNode \ "defender_rank").text,
+				if (orgMembershipNode.isEmpty) 0 else (orgMembershipNode \ "organization_id").text.toInt,
+				server,
+				false,
+				0,
+				0)
 
-					CharacterDao.save(db, character, time)
-					true
-				} catch {
-					case e: SAXParseException =>
-						log.error("Could not parse player info: " + name, e)
-						false
-				}
-			case None =>
-				log.error("Could not retrieve xml file for player: " + name)
-				false
+			CharacterDao.save(db, character, time)
+		} catch {
+			case e: FileNotFoundException =>
+				CharacterDao.save(db, new Character(name, true, server), time)
+			case e: SAXParseException =>
+				throw new Exception("Could not parse player info: " + name, e)
 		}
 	}
 
@@ -212,29 +217,20 @@ object Program extends App {
 		}
 	}
 
-	def retrieveOrgRoster(orgInfo: OrgInfo): Option[List[Character]] = {
-		val orgRosterUrl = "http://people.anarchy-online.com/org/stats/d/%d/name/%d/basicstats.xml"
-		grabPage(orgRosterUrl.format(orgInfo.server, orgInfo.guildId)) match {
-			case Some(p) if p == "filenotfound" =>
-				log.error("FileNotFound for xml file for org: " + orgInfo)
-				None
-			case Some(page) =>
-				try {
-					// remove invalid xml unicode characters from guild: Otto,4556801,1
-					val xml = XML.loadString(page.replace("\u0010", "").replace("\u0018", ""))
-					orgInfo.faction = (xml \ "side").text
-
-					val characters = pullCharInfo((xml \\ "member").reverseIterator, orgInfo)
-
-					Some(characters)
-				} catch {
-					case e: SAXParseException =>
-						log.error("Could not parse roster for org: " + orgInfo, e)
-						None
-				}
-			case None =>
-				log.error("Could not retrieve xml file for org: " + orgInfo)
-				None
+	def retrieveOrgRoster(orgInfo: OrgInfo): List[Character] = {
+		try {
+			val page = grabPage(orgRosterUrl.format(orgInfo.server, orgInfo.guildId))
+			
+			// remove invalid xml unicode characters from guild: Otto,4556801,1
+			val xml = XML.loadString(page.replace("\u0010", "").replace("\u0018", ""))
+			orgInfo.faction = (xml \ "side").text
+	
+			pullCharInfo((xml \\ "member").reverseIterator, orgInfo)
+		} catch {
+			case e: SAXParseException =>
+				throw new Exception("Could not parse roster for org: " + orgInfo, e)
+			case e: Exception =>
+				throw new Exception("Could not retrieve roster for org: " + orgInfo, e)
 		}
 	}
 
@@ -265,28 +261,30 @@ object Program extends App {
 		return pullOrgInfo(iter, new OrgInfo(m.group(2).toInt, m.group(3).trim, m.group(1).toInt) :: list)
 	}
 
-	def grabPage(url: String): Option[String] = {
+	def grabPage(url: String): String = {
 		for (x <- 1 to 10) {
 			log.debug("Attempt " + x + " at grabbing page: " + url)
 			try {
 				using(Source.fromURL(url)("iso-8859-15")) { source =>
-					return Some(source.mkString)
+					return source.mkString
 				}
 			} catch {
 				case e: FileNotFoundException =>
-					// valid response, invalid request (ie. character or guild no longer exists)
-					return Some("filenotfound")
-				case e: IOException => {
+					throw e
+				case e: IOException =>
 					log.warn("Failed on attempt " + x + " to fetch page: " + url, e)
 					Thread.sleep(5000)
-				}
 			}
 		}
-		None
+		throw new Exception("Could not retrieve page at '" + url + "'")
+	}
+	
+	def updateRemaingCharactersDisplay(success: Int, failure: Int, total: Int) {
+		updateDisplay("Characters - Successful: %d  Failed: %d  Total: %d".format(success, failure, total))
 	}
 
-	def updateGuildDisplay(numGuildsSuccess: Int, numGuildsFailure: Int, numGuildsTotal: Int) {
-		updateDisplay("Successful: %d  Failed: %d  Total: %d".format(numGuildsSuccess, numGuildsFailure, numGuildsTotal))
+	def updateGuildDisplay(success: Int, failure: Int, total: Int) {
+		updateDisplay("Organizations - Successful: %d  Failed: %d  Total: %d".format(success, failure, total))
 	}
 
 	def updateDisplay(msg: String) {
