@@ -8,30 +8,41 @@ import com.jkbff.common.DB
 
 object CharacterDao {
 	def save(db: DB, character: Character, time: Long) {
-		val sql = "SELECT 1 FROM player p1 WHERE " +
-			"p1.nickname = ? AND " +
-			"p1.server = ? AND " +
-			"p1.first_name = ? AND " +
-			"p1.last_name = ? AND " +
-			"p1.guild_rank = ? AND " +
-			"p1.guild_rank_name = ? AND " +
-			"p1.level = ? AND " +
-			"p1.faction = ? AND " +
-			"p1.profession = ? AND " +
-			"p1.profession_title = ? AND " +
-			"p1.gender = ? AND " +
-			"p1.breed = ? AND " +
-			"p1.defender_rank = ? AND " +
-			"p1.defender_rank_name = ? AND " +
-			"p1.guild_id = ? AND " +
-			"p1.deleted = ?"
-
-		val result = db.querySingle(sql,
-			List(character.nickname, character.server,
-				character.firstName, character.lastName, character.guildRank, character.guildRankName, character.level,
-				character.faction, character.profession, character.professionTitle, character.gender, character.breed,
-				character.defenderRank, character.defenderRankName, character.guildId, if (character.deleted) 1 else 0),
-			_.getInt(1))
+		val result = 
+			if (character.deleted) {
+				val sql = "SELECT 1 FROM player p1 WHERE " +
+					"p1.nickname = ? AND " +
+					"p1.server = ? AND " +
+					"p1.deleted = ?"
+					
+				db.querySingle(sql,
+					List(character.nickname, character.server, if (character.deleted) 1 else 0),
+					_.getInt(1))
+			} else {
+				val sql = "SELECT 1 FROM player p1 WHERE " +
+					"p1.nickname = ? AND " +
+					"p1.server = ? AND " +
+					"p1.first_name = ? AND " +
+					"p1.last_name = ? AND " +
+					"p1.guild_rank = ? AND " +
+					"p1.guild_rank_name = ? AND " +
+					"p1.level = ? AND " +
+					"p1.faction = ? AND " +
+					"p1.profession = ? AND " +
+					"p1.profession_title = ? AND " +
+					"p1.gender = ? AND " +
+					"p1.breed = ? AND " +
+					"p1.defender_rank = ? AND " +
+					"p1.defender_rank_name = ? AND " +
+					"p1.guild_id = ?"
+		
+				db.querySingle(sql,
+					List(character.nickname, character.server,
+						character.firstName, character.lastName, character.guildRank, character.guildRankName, character.level,
+						character.faction, character.profession, character.professionTitle, character.gender, character.breed,
+						character.defenderRank, character.defenderRankName, character.guildId),
+					_.getInt(1))
+			}
 
 		if (result.isEmpty) {
 			updateInfo(db, character, time)
