@@ -165,7 +165,7 @@ object Program extends App {
 	}
 
 	def updateSinglePlayer(db: DB, server: Int, name: String, time: Long): Unit = {
-		log.info("Updating info for player: " + name)
+		log.debug("Updating info for player: " + name)
 		try {
 			val page = grabPage(playerUrl.format(server, name))
 			
