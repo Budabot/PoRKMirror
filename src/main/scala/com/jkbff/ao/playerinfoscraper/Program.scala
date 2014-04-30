@@ -58,8 +58,8 @@ object Program extends App {
 	def run(startTime: Long) = {
 		log.info("Starting batch " + startTime)
 
-		//val letters = List("a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "others")
-		val letters = List("q", "q")
+		val letters = List("a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "others")
+		//val letters = List("q", "q")
 		//val letters = List("q")
 
 		if (properties.getProperty("create_tables") == "true") {
