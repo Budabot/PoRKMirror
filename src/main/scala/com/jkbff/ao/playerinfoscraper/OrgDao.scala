@@ -34,6 +34,17 @@ object OrgDao {
 			updateLastChecked(db, orgInfo, time)
 		}
 	}
+	
+	def findUnupdatedOrgs(db: DB, server: Int, time: Long): List[OrgInfo] = {
+		val sql =
+			"SELECT * FROM guild g " +
+				"WHERE g.server = ? AND g.last_checked <> ? " +
+				"ORDER BY g.id ASC"
+
+		db.query(sql,
+			List(server, time),
+			{ rs => new OrgInfo(rs) })
+	}
 
 	private def updateLastChecked(db: DB, orgInfo: OrgInfo, time: Long): Int = {
 		val sql = "UPDATE guild SET last_checked = ? WHERE guild_id = ? AND server = ?";

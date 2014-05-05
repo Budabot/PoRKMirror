@@ -90,6 +90,8 @@ object Program extends App {
 			}
 			updateGuildDisplay(numGuildsSuccess.get, numGuildsFailure.get, orgInfoList.size)
 		}
+		
+		updateRemainingOrgs(5, startTime)
 
 		numCharacters.addAndGet(updateRemainingCharacters(5, startTime));
 
@@ -139,6 +141,46 @@ object Program extends App {
 			db.update(source.mkString)
 		}
 	}
+	
+	def updateRemainingOrgs(server: Int, time: Long): Int = {
+		println
+		val numSucess = new AtomicInteger(0)
+		val numFailed = new AtomicInteger
+		using(new DB(ds)) { db =>
+			val list = OrgDao.findUnupdatedOrgs(db, server, time).par
+			updateGuildDisplay(numSucess.get, numFailed.get, list.size)
+			list.tasksupport = new ForkJoinTaskSupport(new scala.concurrent.forkjoin.ForkJoinPool(properties.getProperty("threads").toInt))
+			list.foreach { org =>
+				try {
+					updateSingleOrg(db, server, org.guildId, time)
+					numSucess.addAndGet(1)
+				} catch {
+					case e: Exception =>
+						numFailed.addAndGet(1)
+						log.error("Failed to update org " + org, e)
+				}
+				updateGuildDisplay(numSucess.get, numFailed.get, list.size)
+			}
+		}
+		numSucess.intValue()
+	}
+	
+	def updateSingleOrg(db: DB, server: Int, guildId: Int, time: Long): Unit = {
+		log.debug("Updating info for org id: " + guildId)
+		try {
+			val page = grabPage(orgRosterUrl.format(server, guildId))
+			val xml = parseXML(page)
+			
+			val orgRoster = retrieveOrgRoster(orgInfo)
+			numCharacters.addAndGet(orgRoster.size)
+			save(orgInfo, orgRoster, startTime)
+		} catch {
+			case e: FileNotFoundException =>
+				OrgDao.save(db, new OrgInfo(guildId, "", server, false), time)
+			case e: SAXParseException =>
+				throw new Exception("Could not parse org info for org id: " + guildId, e)
+		}
+	}
 
 	// manually update all remaining characters that haven't already been updated
 	def updateRemainingCharacters(server: Int, time: Long): Int = {
@@ -168,9 +210,7 @@ object Program extends App {
 		log.debug("Updating info for player: " + name)
 		try {
 			val page = grabPage(playerUrl.format(server, name))
-			
-			// remove invalid xml unicode characters from guild: Otto,4556801,1
-			val xml = XML.loadString(page.replace("\u0010", "").replace("\u0018", ""))
+			val xml = parseXML(page)
 			
 			val nameNode = (xml \ "name")
 			val basicStatsNode = (xml \ "basic_stats")
@@ -217,12 +257,10 @@ object Program extends App {
 		}
 	}
 
-	def retrieveOrgRoster(orgInfo: OrgInfo): List[Character] = {
+	def retrieveOrgRoster1(orgInfo: OrgInfo): List[Character] = {
 		try {
 			val page = grabPage(orgRosterUrl.format(orgInfo.server, orgInfo.guildId))
-			
-			// remove invalid xml unicode characters from guild: Otto,4556801,1
-			val xml = XML.loadString(page.replace("\u0010", "").replace("\u0018", ""))
+			val xml = parseXML(page)
 			orgInfo.faction = (xml \ "side").text
 	
 			pullCharInfo((xml \\ "member").reverseIterator, orgInfo)
@@ -243,7 +281,7 @@ object Program extends App {
 		return pullCharInfo(iter, orgInfo, new Character(iter.next, orgInfo.faction, orgInfo.guildId, orgInfo.guildName, orgInfo.server) :: list)
 	}
 
-	def pullOrgInfoFromPage(page: String) = {
+	def pullOrgInfoFromPage(page: String): List[OrgInfo] = {
 		log.debug("Processing page...")
 		val pattern = """(?s)<a href="http://people.anarchy-online.com/org/stats/d/(\d+)/name/(\d+)">(.+?)</a>""".r
 		val orgInfoList = List[OrgInfo]()
@@ -292,5 +330,9 @@ object Program extends App {
 			longestLength = msg.length
 		}
 		print("\r" + msg + (" " * (longestLength - msg.length)))
+	}
+	
+	def parseXML(input: String): Elem = {
+		XML.loadString(input.replace("\u0010", "").replace("\u0018", ""))
 	}
 }
