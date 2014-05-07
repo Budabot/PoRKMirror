@@ -20,9 +20,9 @@
   
 	<dependencies>
 		<dependency>
-			<groupId>com.jkbff.ao</groupId>
-			<artifactId>BudabotItemsExtractor</artifactId>
-			<version>1.2</version>
+			<groupId>com.jkbff.common</groupId>
+			<artifactId>scala-util</artifactId>
+			<version>1.0</version>
 		</dependency>
 		<dependency>
 			<groupId>log4j</groupId>
