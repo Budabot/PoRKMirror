@@ -24,9 +24,7 @@ import java.io.FileNotFoundException
 import com.jkbff.common.Helper
 
 object Program extends App {
-
-	PropertyConfigurator.configure("./log4j.xml")
-
+	
 	private val log = Logger.getLogger(getClass())
 
 	val properties = new Properties();
@@ -188,6 +186,7 @@ object Program extends App {
 				(basicStatsNode \ "defender_rank_id").text.toInt,
 				(basicStatsNode \ "defender_rank").text,
 				if (orgMembershipNode.isEmpty) 0 else (orgMembershipNode \ "organization_id").text.toInt,
+				if (orgMembershipNode.isEmpty) "" else (orgMembershipNode \ "organization_name").text,
 				server,
 				false,
 				0,

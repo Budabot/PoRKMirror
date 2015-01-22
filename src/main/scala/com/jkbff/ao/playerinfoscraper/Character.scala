@@ -18,24 +18,44 @@ class Character(
 	val defenderRank: Int,
 	val defenderRankName: String,
 	val guildId: Int,
+	val guildName: String,
 	val server: Int,
 	val deleted: Boolean,
 	val lastChecked: Long,
 	val lastChanged: Long) {
 
 	def this(node: Node, faction: String, guildId: Int, guildName: String, server: Int) {
-		this((node \ "nickname").text, (node \ "firstname").text, (node \ "lastname").text, (node \ "rank").text.toInt, (node \ "rank_name").text, (node \ "level").text.toInt, faction, (node \ "profession").text, (node \ "profession_title").text, (node \ "gender").text, (node \ "breed").text, (node \ "defender_rank_id").text.toInt, (node \ "defender_rank").text, guildId, server, false, 0, 0);
+		this(
+				(node \ "nickname").text,
+				(node \ "firstname").text,
+				(node \ "lastname").text,
+				(node \ "rank").text.toInt,
+				(node \ "rank_name").text,
+				(node \ "level").text.toInt,
+				faction,
+				(node \ "profession").text,
+				(node \ "profession_title").text,
+				(node \ "gender").text,
+				(node \ "breed").text,
+				(node \ "defender_rank_id").text.toInt,
+				(node \ "defender_rank").text,
+				guildId,
+				guildName,
+				server,
+				false,
+				0,
+				0);
 	}
 
 	def this(rs: ResultSet) {
 		this(rs.getString("nickname"), rs.getString("first_name"), rs.getString("last_name"), rs.getInt("guild_rank"), rs.getString("guild_rank_name"),
 			rs.getInt("level"), rs.getString("faction"), rs.getString("profession"), rs.getString("profession_title"), rs.getString("gender"),
-			rs.getString("breed"), rs.getInt("defender_rank"), rs.getString("defender_rank_name"), rs.getInt("guild_id"), rs.getInt("server"),
-			rs.getInt("deleted") == 1, rs.getLong("last_checked"), rs.getLong("last_changed"))
+			rs.getString("breed"), rs.getInt("defender_rank"), rs.getString("defender_rank_name"), rs.getInt("guild_id"), rs.getString("guild_name"),
+			rs.getInt("server"), rs.getInt("deleted") == 1, rs.getLong("last_checked"), rs.getLong("last_changed"))
 	}
 
 	def this(name: String, deleted: Boolean, server: Int) {
-		this(name, "", "", 0, "", 0, "", "", "", "", "", 0, "", 0, server, deleted, 0, 0)
+		this(name, "", "", 0, "", 0, "", "", "", "", "", 0, "", 0, "", server, deleted, 0, 0)
 	}
 
 	def compare(character: Character): Boolean = {

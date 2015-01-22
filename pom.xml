@@ -83,7 +83,7 @@
 							<outputDirectory>${releaseDir}</outputDirectory>
 							<resources>
 								<resource>
-									<directory>src/main/resources</directory>
+									<directory>src/main/config</directory>
 									<filtering>false</filtering>
 								</resource>
 							</resources>

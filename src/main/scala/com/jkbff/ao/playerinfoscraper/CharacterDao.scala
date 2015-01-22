@@ -34,13 +34,14 @@ object CharacterDao {
 					"p1.breed = ? AND " +
 					"p1.defender_rank = ? AND " +
 					"p1.defender_rank_name = ? AND " +
-					"p1.guild_id = ?"
+					"p1.guild_id = ? AND " +
+					"p1.guild_name = ?"
 		
 				db.querySingle(sql,
 					List(character.nickname, character.server,
 						character.firstName, character.lastName, character.guildRank, character.guildRankName, character.level,
 						character.faction, character.profession, character.professionTitle, character.gender, character.breed,
-						character.defenderRank, character.defenderRankName, character.guildId),
+						character.defenderRank, character.defenderRankName, character.guildId, character.guildName),
 					_.getInt(1))
 			}
 
@@ -77,14 +78,14 @@ object CharacterDao {
 			val params = List(character.firstName, character.lastName, character.guildRank,
 				character.guildRankName, character.level, character.faction, character.profession, character.professionTitle,
 				character.gender, character.breed, character.defenderRank, character.defenderRankName, character.guildId,
-				if (character.deleted) 1 else 0, time, time, character.nickname, character.server)
+				character.guildName, if (character.deleted) 1 else 0, time, time, character.nickname, character.server)
 			
 			val updateSql = 
 				"UPDATE player SET " +
 					"first_name = ?, last_name = ?, guild_rank = ?, guild_rank_name = ?, " +
 					"level = ?, faction = ?, profession = ?, profession_title = ?, gender = ?, " +
 					"breed = ?, defender_rank = ?, defender_rank_name = ?, guild_id = ?, " +
-					"deleted = ?, last_checked = ?, last_changed = ? " +
+					"guild_name = ?, deleted = ?, last_checked = ?, last_changed = ? " +
 				"WHERE " +
 					"nickname = ? AND server = ?";
 			
@@ -95,10 +96,10 @@ object CharacterDao {
 					"INSERT INTO player (" +
 						"first_name, last_name, guild_rank, guild_rank_name, " +
 						"level, faction, profession, profession_title, gender, breed, " +
-						"defender_rank, defender_rank_name, guild_id, " +
+						"defender_rank, defender_rank_name, guild_id, guild_name, " +
 						"deleted, last_checked, last_changed, nickname, server " +
 					") VALUES (" +
-						"?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?" +
+						"?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?" +
 					")"
 		
 				db.update(insertSql, params)
