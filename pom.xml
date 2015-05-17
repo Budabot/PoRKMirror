@@ -36,6 +36,11 @@
 			<artifactId>scala-library</artifactId>
 			<version>2.11.6</version>
 		</dependency>
+        <dependency>
+            <groupId>org.scala-lang.modules</groupId>
+            <artifactId>scala-xml_2.11</artifactId>
+            <version>1.0.4</version>
+        </dependency>
 	</dependencies>
 	
 	<build>
@@ -55,7 +60,7 @@
 							<outputDirectory>${releaseDir}</outputDirectory>
 							<resources>
 								<resource>
-									<directory>src/main/config</directory>
+									<directory>src/main/resources</directory>
 									<filtering>false</filtering>
 								</resource>
 							</resources>
