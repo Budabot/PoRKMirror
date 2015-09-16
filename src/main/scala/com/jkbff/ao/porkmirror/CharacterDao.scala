@@ -54,7 +54,7 @@ object CharacterDao {
 	def findUnupdatedMembers(db: DB, server: Int, time: Long): List[Character] = {
 		val sql =
 			"SELECT * FROM player p " +
-				"WHERE p.server = ? AND p.last_checked <> ? AND p.deleted = ?" +
+				"WHERE p.server = ? AND p.last_checked <> ? AND p.deleted = ? " +
 				"ORDER BY nickname ASC"
 
 		db.query(sql,

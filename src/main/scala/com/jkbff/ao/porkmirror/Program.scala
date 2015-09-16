@@ -2,6 +2,8 @@ package com.jkbff.ao.porkmirror
 
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicInteger
+import com.google.common.xml.XmlEscapers
+
 import scala.annotation.tailrec
 import scala.io.Source
 import scala.util.matching.Regex.Match
@@ -101,9 +103,9 @@ object Program extends App {
 		println
 
 		val elapsedTime = "Elapsed time: " + (elapsed.toDouble / 1000) + "s"
-		val numCharactersParsed = "Characters parsed: " + numCharacters
-		log.info("Success: " + numGuildsSuccess.get)
-		log.info("Failure: " + numGuildsFailure.get)
+		val numCharactersParsed = "Characters parsed: " + numCharacters.get
+		log.info("Organizations - Success: %d  Failure: %d".format(numGuildsSuccess.get, numGuildsFailure.get))
+		log.info("Characters - Success: %d  Failure: %d".format(numGuildsSuccess.get, numGuildsFailure.get))
 		log.info(elapsedTime)
 		log.info(numCharactersParsed)
 		log.info("Finished batch " + startTime)
@@ -142,25 +144,25 @@ object Program extends App {
 	// manually update all remaining characters that haven't already been updated
 	def updateRemainingCharacters(server: Int, time: Long): Int = {
 		println
-		val numSucess = new AtomicInteger(0)
+		val numSuccess = new AtomicInteger(0)
 		val numFailed = new AtomicInteger
 		using(new DB(ds)) { db =>
 			val list = CharacterDao.findUnupdatedMembers(db, server, time).par
-			updateRemaingCharactersDisplay(numSucess.get, numFailed.get, list.size)
+			updateRemaingCharactersDisplay(numSuccess.get, numFailed.get, list.size)
 			list.tasksupport = new ForkJoinTaskSupport(new scala.concurrent.forkjoin.ForkJoinPool(properties.getProperty("threads").toInt))
 			list.foreach { character =>
 				try {
 					updateSinglePlayer(db, server, character.nickname, time)
-					numSucess.addAndGet(1)
+					numSuccess.addAndGet(1)
 				} catch {
 					case e: Exception =>
 						numFailed.addAndGet(1)
 						log.error("Failed to update character " + character, e)
 				}
-				updateRemaingCharactersDisplay(numSucess.get, numFailed.get, list.size)
+				updateRemaingCharactersDisplay(numSuccess.get, numFailed.get, list.size)
 			}
 		}
-		numSucess.intValue()
+		numSuccess.intValue()
 	}
 
 	def updateSinglePlayer(db: DB, server: Int, name: String, time: Long): Unit = {
@@ -172,7 +174,7 @@ object Program extends App {
 				if ("null" == page) {
 					new Character(name, true, server)
 				} else {
-					val xml = parseXML(page)
+					val xml = parseXML(cleanXMLTags(page, Seq("organization_name")))
 
 					val nameNode = (xml \ "name")
 					val basicStatsNode = (xml \ "basic_stats")
@@ -223,7 +225,7 @@ object Program extends App {
 	def retrieveOrgRoster(orgInfo: OrgInfo): List[Character] = {
 		try {
 			val page = grabPage(orgRosterUrl.format(orgInfo.server, orgInfo.guildId))
-			val xml = parseXML(page)
+			val xml = parseXML(cleanXMLTags(page, Seq("name")))
 			orgInfo.faction = (xml \ "side").text
 	
 			pullCharInfo((xml \\ "member").reverseIterator, orgInfo)
@@ -301,5 +303,21 @@ object Program extends App {
 	
 	def parseXML(input: String): Elem = {
 		XML.loadString(input.replace("\u0010", "").replace("\u0018", ""))
+	}
+
+	def cleanXMLTags(input: String, tags: Seq[String]): String = {
+		val buffer = new StringBuffer(input)
+
+		val xmlContentEscaper = XmlEscapers.xmlContentEscaper()
+
+		tags.foreach{ tag =>
+			val end = buffer.indexOf("</" + tag + ">")
+			if (end != -1) {
+				val start = buffer.indexOf("<" + tag + ">") + tag.size + 2
+				buffer.replace(start, end, xmlContentEscaper.escape(buffer.substring(start, end)))
+			}
+		}
+
+		buffer.toString
 	}
 }

@@ -1,2 +1,2 @@
-java -cp ./lib/*; com.jkbff.ao.playerinfoscraper.Program
+java -cp ./lib/*; com.jkbff.ao.porkmirror.Program
 pause
