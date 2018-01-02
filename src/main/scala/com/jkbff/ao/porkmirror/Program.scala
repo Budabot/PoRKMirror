@@ -1,29 +1,21 @@
 package com.jkbff.ao.porkmirror
 
-import java.io.IOException
-import java.util.concurrent.atomic.AtomicInteger
-import com.google.common.xml.XmlEscapers
-
-import scala.annotation.tailrec
-import scala.io.Source
-import scala.util.matching.Regex.Match
-import scala.util.matching.Regex
-import scala.xml.Elem
-import scala.xml.Node
-import scala.xml.XML
-import org.apache.log4j.Logger
-import org.apache.log4j.PropertyConfigurator
-import org.xml.sax.SAXParseException
-import scala.None
-import scala.collection.parallel.ForkJoinTaskSupport
+import java.io.{FileInputStream, FileNotFoundException, IOException}
 import java.util.Properties
-import java.io.FileInputStream
-import java.sql.Connection
+import java.util.concurrent.atomic.AtomicInteger
+
+import com.google.common.xml.XmlEscapers
+import com.jkbff.common.{DB, Helper}
 import com.jkbff.common.Helper._
 import org.apache.commons.dbcp.BasicDataSource
-import com.jkbff.common.DB
-import java.io.FileNotFoundException
-import com.jkbff.common.Helper
+import org.apache.log4j.{Logger, PropertyConfigurator}
+import org.xml.sax.SAXParseException
+
+import scala.annotation.tailrec
+import scala.collection.parallel.ForkJoinTaskSupport
+import scala.io.Source
+import scala.util.matching.Regex.Match
+import scala.xml.{Elem, Node, XML}
 
 object Program extends App {
 
@@ -31,8 +23,8 @@ object Program extends App {
 
 	private val log = Logger.getLogger(getClass())
 
-	val properties = new Properties();
-	properties.load(new FileInputStream("config.properties"));
+	val properties = new Properties()
+	properties.load(new FileInputStream("config.properties"))
 
 	val playerUrl = "http://people.anarchy-online.com/character/bio/d/%d/name/%s/bio.xml"
 	val orgRosterUrl = "http://people.anarchy-online.com/org/stats/d/%d/name/%d/basicstats.xml"
@@ -58,7 +50,7 @@ object Program extends App {
 			e.printStackTrace()
 	}
 
-	def run(startTime: Long) = {
+	def run(startTime: Long): Unit = {
 		log.info("Starting batch " + startTime)
 
 		val letters = properties.getProperty("letters").split(",")
@@ -92,7 +84,7 @@ object Program extends App {
 			updateGuildDisplay(numGuildsSuccess.get, numGuildsFailure.get, orgInfoList.size)
 		}
 
-		numCharacters.addAndGet(updateRemainingCharacters(5, startTime));
+		numCharacters.addAndGet(updateRemainingCharacters(5, startTime))
 
 		val elapsed = System.currentTimeMillis - startTime
 
@@ -148,7 +140,7 @@ object Program extends App {
 		val numFailed = new AtomicInteger
 		using(new DB(ds)) { db =>
 			val list = CharacterDao.findUnupdatedMembers(db, server, time).par
-			updateRemaingCharactersDisplay(numSuccess.get, numFailed.get, list.size)
+			updateRemainingCharactersDisplay(numSuccess.get, numFailed.get, list.size)
 			list.tasksupport = new ForkJoinTaskSupport(new scala.concurrent.forkjoin.ForkJoinPool(properties.getProperty("threads").toInt))
 			list.foreach { character =>
 				try {
@@ -159,7 +151,7 @@ object Program extends App {
 						numFailed.addAndGet(1)
 						log.error("Failed to update character " + character, e)
 				}
-				updateRemaingCharactersDisplay(numSuccess.get, numFailed.get, list.size)
+				updateRemainingCharactersDisplay(numSuccess.get, numFailed.get, list.size)
 			}
 		}
 		numSuccess.intValue()
@@ -203,14 +195,14 @@ object Program extends App {
 
 			CharacterDao.save(db, character, time)
 		} catch {
-			case e: FileNotFoundException =>
+			case _: FileNotFoundException =>
 				CharacterDao.save(db, new Character(name, true, server), time)
 			case e: SAXParseException =>
 				throw new Exception("Could not parse player info: " + playerUrl.format(server, name), e)
 		}
 	}
 
-	def save(orgInfo: OrgInfo, characters: List[Character], time: Long) = {
+	def save(orgInfo: OrgInfo, characters: List[Character], time: Long): Unit = {
 		log.debug("Saving guild members for guild: " + orgInfo)
 		using(new DB(ds)) { db =>
 			db.transaction {
@@ -240,16 +232,15 @@ object Program extends App {
 	@tailrec
 	def pullCharInfo(iter: Iterator[Node], orgInfo: OrgInfo, list: List[Character] = Nil): List[Character] = {
 		if (!iter.hasNext) {
-			return list
+			list
+		} else {
+			pullCharInfo(iter, orgInfo, new Character(iter.next, orgInfo.faction, orgInfo.guildId, orgInfo.guildName, orgInfo.server) :: list)
 		}
-
-		return pullCharInfo(iter, orgInfo, new Character(iter.next, orgInfo.faction, orgInfo.guildId, orgInfo.guildName, orgInfo.server) :: list)
 	}
 
 	def pullOrgInfoFromPage(page: String): List[OrgInfo] = {
 		log.debug("Processing page...")
 		val pattern = """(?s)<a href="http://people.anarchy-online.com/org/stats/d/(\d+)/name/(\d+)">(.+?)</a>""".r
-		val orgInfoList = List[OrgInfo]()
 
 		pullOrgInfo(pattern.findAllIn(page).matchData)
 	}
@@ -257,11 +248,11 @@ object Program extends App {
 	@tailrec
 	def pullOrgInfo(iter: Iterator[Match], list: List[OrgInfo] = Nil): List[OrgInfo] = {
 		if (!iter.hasNext) {
-			return list
+			list
+		} else {
+			val m = iter.next
+			pullOrgInfo(iter, new OrgInfo(m.group(2).toInt, m.group(3).trim, m.group(1).toInt, false) :: list)
 		}
-
-		val m = iter.next
-		return pullOrgInfo(iter, new OrgInfo(m.group(2).toInt, m.group(3).trim, m.group(1).toInt, false) :: list)
 	}
 
 	def grabPage(url: String): String = {
@@ -286,7 +277,7 @@ object Program extends App {
 		throw new Exception("Could not retrieve page at '" + url + "'")
 	}
 	
-	def updateRemaingCharactersDisplay(success: Int, failure: Int, total: Int) {
+	def updateRemainingCharactersDisplay(success: Int, failure: Int, total: Int) {
 		updateDisplay("Characters - Successful: %d  Failed: %d  Total: %d".format(success, failure, total))
 	}
 
@@ -313,7 +304,7 @@ object Program extends App {
 		tags.foreach{ tag =>
 			val end = buffer.indexOf("</" + tag + ">")
 			if (end != -1) {
-				val start = buffer.indexOf("<" + tag + ">") + tag.size + 2
+				val start = buffer.indexOf("<" + tag + ">") + tag.length + 2
 				buffer.replace(start, end, xmlContentEscaper.escape(buffer.substring(start, end)))
 			}
 		}
