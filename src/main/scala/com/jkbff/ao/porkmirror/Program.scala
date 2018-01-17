@@ -19,13 +19,14 @@ import scala.xml.{Elem, Node, XML}
 
 object Program extends App {
 
-	PropertyConfigurator.configure("./log4j.xml")
+	//PropertyConfigurator.configure("./log4j.xml")
 
 	private val log = Logger.getLogger(getClass())
 
 	val properties = new Properties()
-	properties.load(new FileInputStream("config.properties"))
+	properties.load(this.getClass().getResourceAsStream("/config.properties"))
 
+	val orgNameUrl = "http://people.anarchy-online.com/people/lookup/orgs.html?l=%s"
 	val playerUrl = "http://people.anarchy-online.com/character/bio/d/%d/name/%s/bio.xml"
 	val orgRosterUrl = "http://people.anarchy-online.com/org/stats/d/%d/name/%d/basicstats.xml"
 
@@ -104,8 +105,6 @@ object Program extends App {
 	}
 
 	def getOrgInfoList(letters: Seq[String]): List[OrgInfo] = {
-		val orgNameUrl = "http://people.anarchy-online.com/people/lookup/orgs.html?l=%s"
-
 		letters.foldLeft(List[OrgInfo]()) { (list, letter) =>
 			updateDisplay("Grabbing orgs that start with: '" + letter + "'")
 			try {
