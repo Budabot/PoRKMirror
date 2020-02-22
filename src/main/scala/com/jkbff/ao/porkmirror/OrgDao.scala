@@ -1,7 +1,5 @@
 package com.jkbff.ao.porkmirror
-import java.sql.Connection
-import scala.io.Source
-import com.jkbff.common.Helper
+
 import com.jkbff.common.DB
 
 object OrgDao {
