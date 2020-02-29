@@ -29,7 +29,7 @@ object Program extends App {
 	val orgNameUrl = "http://people.anarchy-online.com/people/lookup/orgs.html?l=%s"
 	val playerUrl = "http://people.anarchy-online.com/character/bio/d/%d/name/%s/bio.xml"
 	val orgRosterUrl = "http://people.anarchy-online.com/org/stats/d/%d/name/%d/basicstats.xml"
-	val orgLinkPattern = """(?s)<a href=//people.anarchy-online.com/org/stats/d/(\d+)/name/(\d+)">(.+?)</a>""".r
+	val orgLinkPattern = """(?s)<a href="//people.anarchy-online.com/org/stats/d/(\d+)/name/(\d+)">(.+?)</a>""".r
 
 	var longestLength = 0
 	
