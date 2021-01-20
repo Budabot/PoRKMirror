@@ -1,3 +1,7 @@
+This project is now archived and superseded by: https://github.com/Budabot/pork-scraper
+
+-Tyrence
+
 # PoRKMirror
 Scrapes People of Rubi-Ka (people.anarchy-online.com) to record character history
 
